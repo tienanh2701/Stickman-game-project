@@ -1,0 +1,520 @@
+fileFormatVersion: 2
+guid: 6444b0db3a4f0fa43b63a79a95b011eb
+TextureImporter:
+  internalIDToNameTable:
+  - first:
+      213: -3437109227613628806
+    second: Shocker_LungeStrike_0_0
+  - first:
+      213: 6940557549189776683
+    second: Shocker_LungeStrike_0_1
+  - first:
+      213: -5854892358040577879
+    second: Shocker_LungeStrike_0_2
+  - first:
+      213: 6206908837375367054
+    second: Shocker_LungeStrike_0_3
+  - first:
+      213: 7807423330731867185
+    second: Shocker_LungeStrike_0_4
+  - first:
+      213: -32839053806052309
+    second: Shocker_LungeStrike_0_5
+  - first:
+      213: -1421246768516530398
+    second: Shocker_LungeStrike_0_6
+  - first:
+      213: -6238719796237416378
+    second: Shocker_LungeStrike_0_7
+  - first:
+      213: 6152534329586149639
+    second: Shocker_LungeStrike_0_8
+  - first:
+      213: -9195273318612924142
+    second: Shocker_LungeStrike_0_9
+  - first:
+      213: 455887567640521225
+    second: Shocker_LungeStrike_0_10
+  - first:
+      213: 3421239328678981853
+    second: Shocker_LungeStrike_0_11
+  - first:
+      213: -3925075154001773789
+    second: Shocker_LungeStrike_0_12
+  - first:
+      213: 5590884339373895687
+    second: Shocker_LungeStrike_0_13
+  - first:
+      213: -7758960773747970517
+    second: Shocker_LungeStrike_0_14
+  externalObjects: {}
+  serializedVersion: 13
+  mipmaps:
+    mipMapMode: 0
+    enableMipMap: 0
+    sRGBTexture: 1
+    linearTexture: 0
+    fadeOut: 0
+    borderMipMap: 0
+    mipMapsPreserveCoverage: 0
+    alphaTestReferenceValue: 0.5
+    mipMapFadeDistanceStart: 1
+    mipMapFadeDistanceEnd: 3
+  bumpmap:
+    convertToNormalMap: 0
+    externalNormalMap: 0
+    heightScale: 0.25
+    normalMapFilter: 0
+    flipGreenChannel: 0
+  isReadable: 0
+  streamingMipmaps: 0
+  streamingMipmapsPriority: 0
+  vTOnly: 0
+  ignoreMipmapLimit: 0
+  grayScaleToAlpha: 0
+  generateCubemap: 6
+  cubemapConvolution: 0
+  seamlessCubemap: 0
+  textureFormat: 1
+  maxTextureSize: 2048
+  textureSettings:
+    serializedVersion: 2
+    filterMode: 1
+    aniso: 1
+    mipBias: 0
+    wrapU: 1
+    wrapV: 1
+    wrapW: 1
+  nPOTScale: 0
+  lightmap: 0
+  compressionQuality: 50
+  spriteMode: 1
+  spriteExtrude: 1
+  spriteMeshType: 1
+  alignment: 7
+  spritePivot: {x: 0.5, y: 0}
+  spritePixelsToUnits: 160
+  spriteBorder: {x: 0, y: 0, z: 0, w: 0}
+  spriteGenerateFallbackPhysicsShape: 1
+  alphaUsage: 1
+  alphaIsTransparency: 1
+  spriteTessellationDetail: -1
+  textureType: 8
+  textureShape: 1
+  singleChannelComponent: 0
+  flipbookRows: 1
+  flipbookColumns: 1
+  maxTextureSizeSet: 0
+  compressionQualitySet: 0
+  textureFormatSet: 0
+  ignorePngGamma: 0
+  applyGammaDecoding: 0
+  swizzle: 50462976
+  cookieLightType: 0
+  platformSettings:
+  - serializedVersion: 4
+    buildTarget: DefaultTexturePlatform
+    maxTextureSize: 4096
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 0
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 4
+    buildTarget: Standalone
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 4
+    buildTarget: WebGL
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  spriteSheet:
+    serializedVersion: 2
+    sprites:
+    - serializedVersion: 2
+      name: Shocker_LungeStrike_0_0
+      rect:
+        serializedVersion: 2
+        x: 19
+        y: 15
+        width: 278
+        height: 221
+      alignment: 7
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: a765fd93e5fec40d0800000000000000
+      internalID: -3437109227613628806
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Shocker_LungeStrike_0_1
+      rect:
+        serializedVersion: 2
+        x: 233
+        y: 234
+        width: 13
+        height: 8
+      alignment: 7
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: b25cc9e7150d15060800000000000000
+      internalID: 6940557549189776683
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Shocker_LungeStrike_0_2
+      rect:
+        serializedVersion: 2
+        x: 247
+        y: 229
+        width: 23
+        height: 13
+      alignment: 7
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 9a897d0cb6e3fbea0800000000000000
+      internalID: -5854892358040577879
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Shocker_LungeStrike_0_3
+      rect:
+        serializedVersion: 2
+        x: 277
+        y: 207
+        width: 75
+        height: 35
+      alignment: 7
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: e87ddf4b3be532650800000000000000
+      internalID: 6206908837375367054
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Shocker_LungeStrike_0_4
+      rect:
+        serializedVersion: 2
+        x: 289
+        y: 185
+        width: 20
+        height: 23
+      alignment: 7
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 13cbe5f572a895c60800000000000000
+      internalID: 7807423330731867185
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Shocker_LungeStrike_0_5
+      rect:
+        serializedVersion: 2
+        x: 344
+        y: 203
+        width: 8
+        height: 19
+      alignment: 7
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: b2c5127fd055b8ff0800000000000000
+      internalID: -32839053806052309
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Shocker_LungeStrike_0_6
+      rect:
+        serializedVersion: 2
+        x: 299
+        y: 172
+        width: 10
+        height: 10
+      alignment: 7
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 22f76681897b64ce0800000000000000
+      internalID: -1421246768516530398
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Shocker_LungeStrike_0_7
+      rect:
+        serializedVersion: 2
+        x: 308
+        y: 137
+        width: 44
+        height: 58
+      alignment: 7
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 6484214466d9b69a0800000000000000
+      internalID: -6238719796237416378
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Shocker_LungeStrike_0_8
+      rect:
+        serializedVersion: 2
+        x: 291
+        y: 159
+        width: 14
+        height: 10
+      alignment: 7
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 709e06f0061326550800000000000000
+      internalID: 6152534329586149639
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Shocker_LungeStrike_0_9
+      rect:
+        serializedVersion: 2
+        x: 295
+        y: 142
+        width: 10
+        height: 14
+      alignment: 7
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 2190377a2a3d36080800000000000000
+      internalID: -9195273318612924142
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Shocker_LungeStrike_0_10
+      rect:
+        serializedVersion: 2
+        x: 304
+        y: 128
+        width: 24
+        height: 19
+      alignment: 7
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 90aeabec353a35600800000000000000
+      internalID: 455887567640521225
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Shocker_LungeStrike_0_11
+      rect:
+        serializedVersion: 2
+        x: 282
+        y: 102
+        width: 23
+        height: 23
+      alignment: 7
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: dd0b18dfa0faa7f20800000000000000
+      internalID: 3421239328678981853
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Shocker_LungeStrike_0_12
+      rect:
+        serializedVersion: 2
+        x: 304
+        y: 97
+        width: 15
+        height: 26
+      alignment: 7
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 32b330181f45789c0800000000000000
+      internalID: -3925075154001773789
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Shocker_LungeStrike_0_13
+      rect:
+        serializedVersion: 2
+        x: 327
+        y: 106
+        width: 25
+        height: 28
+      alignment: 7
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 700fca45fafc69d40800000000000000
+      internalID: 5590884339373895687
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Shocker_LungeStrike_0_14
+      rect:
+        serializedVersion: 2
+        x: 176
+        y: 15
+        width: 19
+        height: 8
+      alignment: 7
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: b2eef86f842a25490800000000000000
+      internalID: -7758960773747970517
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    outline: []
+    customData: 
+    physicsShape: []
+    bones: []
+    spriteID: 5e97eb03825dee720800000000000000
+    internalID: 0
+    vertices: []
+    indices: 
+    edges: []
+    weights: []
+    secondaryTextures: []
+    spriteCustomMetadata:
+      entries: []
+    nameFileIdTable:
+      Shocker_LungeStrike_0_0: -3437109227613628806
+      Shocker_LungeStrike_0_1: 6940557549189776683
+      Shocker_LungeStrike_0_10: 455887567640521225
+      Shocker_LungeStrike_0_11: 3421239328678981853
+      Shocker_LungeStrike_0_12: -3925075154001773789
+      Shocker_LungeStrike_0_13: 5590884339373895687
+      Shocker_LungeStrike_0_14: -7758960773747970517
+      Shocker_LungeStrike_0_2: -5854892358040577879
+      Shocker_LungeStrike_0_3: 6206908837375367054
+      Shocker_LungeStrike_0_4: 7807423330731867185
+      Shocker_LungeStrike_0_5: -32839053806052309
+      Shocker_LungeStrike_0_6: -1421246768516530398
+      Shocker_LungeStrike_0_7: -6238719796237416378
+      Shocker_LungeStrike_0_8: 6152534329586149639
+      Shocker_LungeStrike_0_9: -9195273318612924142
+  mipmapLimitGroupName: 
+  pSDRemoveMatte: 0
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 

@@ -1,0 +1,442 @@
+fileFormatVersion: 2
+guid: c973e4b7ae3108d458f5b69bb32f3793
+TextureImporter:
+  internalIDToNameTable:
+  - first:
+      213: -4359003750781787366
+    second: Kasshin_Death_0_0
+  - first:
+      213: 8482717531720775615
+    second: Kasshin_Death_0_1
+  - first:
+      213: 9118767320134860451
+    second: Kasshin_Death_0_2
+  - first:
+      213: 8986227187365917854
+    second: Kasshin_Death_0_3
+  - first:
+      213: 7935165073625472993
+    second: Kasshin_Death_0_4
+  - first:
+      213: -6122636193404480311
+    second: Kasshin_Death_0_5
+  - first:
+      213: -1480651550013172069
+    second: Kasshin_Death_0_6
+  - first:
+      213: -6465109226285685308
+    second: Kasshin_Death_0_7
+  - first:
+      213: 4143237981060790851
+    second: Kasshin_Death_0_8
+  - first:
+      213: 2648235834913806478
+    second: Kasshin_Death_0_9
+  - first:
+      213: 3911396291548875377
+    second: Kasshin_Death_0_10
+  - first:
+      213: -61161019048452471
+    second: Kasshin_Death_0_11
+  externalObjects: {}
+  serializedVersion: 13
+  mipmaps:
+    mipMapMode: 0
+    enableMipMap: 0
+    sRGBTexture: 1
+    linearTexture: 0
+    fadeOut: 0
+    borderMipMap: 0
+    mipMapsPreserveCoverage: 0
+    alphaTestReferenceValue: 0.5
+    mipMapFadeDistanceStart: 1
+    mipMapFadeDistanceEnd: 3
+  bumpmap:
+    convertToNormalMap: 0
+    externalNormalMap: 0
+    heightScale: 0.25
+    normalMapFilter: 0
+    flipGreenChannel: 0
+  isReadable: 0
+  streamingMipmaps: 0
+  streamingMipmapsPriority: 0
+  vTOnly: 0
+  ignoreMipmapLimit: 0
+  grayScaleToAlpha: 0
+  generateCubemap: 6
+  cubemapConvolution: 0
+  seamlessCubemap: 0
+  textureFormat: 1
+  maxTextureSize: 2048
+  textureSettings:
+    serializedVersion: 2
+    filterMode: 1
+    aniso: 1
+    mipBias: 0
+    wrapU: 1
+    wrapV: 1
+    wrapW: 1
+  nPOTScale: 0
+  lightmap: 0
+  compressionQuality: 50
+  spriteMode: 1
+  spriteExtrude: 1
+  spriteMeshType: 1
+  alignment: 7
+  spritePivot: {x: 0.5, y: 0}
+  spritePixelsToUnits: 160
+  spriteBorder: {x: 0, y: 0, z: 0, w: 0}
+  spriteGenerateFallbackPhysicsShape: 1
+  alphaUsage: 1
+  alphaIsTransparency: 1
+  spriteTessellationDetail: -1
+  textureType: 8
+  textureShape: 1
+  singleChannelComponent: 0
+  flipbookRows: 1
+  flipbookColumns: 1
+  maxTextureSizeSet: 0
+  compressionQualitySet: 0
+  textureFormatSet: 0
+  ignorePngGamma: 0
+  applyGammaDecoding: 0
+  swizzle: 50462976
+  cookieLightType: 0
+  platformSettings:
+  - serializedVersion: 4
+    buildTarget: DefaultTexturePlatform
+    maxTextureSize: 4096
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 0
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 4
+    buildTarget: Standalone
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 4
+    buildTarget: WebGL
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  spriteSheet:
+    serializedVersion: 2
+    sprites:
+    - serializedVersion: 2
+      name: Kasshin_Death_0_0
+      rect:
+        serializedVersion: 2
+        x: 19
+        y: 191
+        width: 11
+        height: 11
+      alignment: 7
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: a136e040f25b183c0800000000000000
+      internalID: -4359003750781787366
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Kasshin_Death_0_1
+      rect:
+        serializedVersion: 2
+        x: 75
+        y: 191
+        width: 14
+        height: 11
+      alignment: 7
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: fb7f138d6aaa8b570800000000000000
+      internalID: 8482717531720775615
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Kasshin_Death_0_2
+      rect:
+        serializedVersion: 2
+        x: 106
+        y: 191
+        width: 23
+        height: 11
+      alignment: 7
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 3ae341a709e5c8e70800000000000000
+      internalID: 9118767320134860451
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Kasshin_Death_0_3
+      rect:
+        serializedVersion: 2
+        x: 89
+        y: 156
+        width: 15
+        height: 16
+      alignment: 7
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: e9437ed040e75bc70800000000000000
+      internalID: 8986227187365917854
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Kasshin_Death_0_4
+      rect:
+        serializedVersion: 2
+        x: 131
+        y: 166
+        width: 16
+        height: 16
+      alignment: 7
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 1ef5887979e5f1e60800000000000000
+      internalID: 7935165073625472993
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Kasshin_Death_0_5
+      rect:
+        serializedVersion: 2
+        x: 174
+        y: 152
+        width: 12
+        height: 15
+      alignment: 7
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 9c41d2b32d6080ba0800000000000000
+      internalID: -6122636193404480311
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Kasshin_Death_0_6
+      rect:
+        serializedVersion: 2
+        x: 220
+        y: 95
+        width: 132
+        height: 87
+      alignment: 7
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: b965555924ba37be0800000000000000
+      internalID: -1480651550013172069
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Kasshin_Death_0_7
+      rect:
+        serializedVersion: 2
+        x: 117
+        y: 138
+        width: 16
+        height: 12
+      alignment: 7
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 4c5242d89615746a0800000000000000
+      internalID: -6465109226285685308
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Kasshin_Death_0_8
+      rect:
+        serializedVersion: 2
+        x: 143
+        y: 127
+        width: 31
+        height: 34
+      alignment: 7
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 34af801fdfcbf7930800000000000000
+      internalID: 4143237981060790851
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Kasshin_Death_0_9
+      rect:
+        serializedVersion: 2
+        x: 185
+        y: 120
+        width: 26
+        height: 23
+      alignment: 7
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: e885f7df57c60c420800000000000000
+      internalID: 2648235834913806478
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Kasshin_Death_0_10
+      rect:
+        serializedVersion: 2
+        x: 82
+        y: 15
+        width: 243
+        height: 113
+      alignment: 7
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 17a0d852432184630800000000000000
+      internalID: 3911396291548875377
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Kasshin_Death_0_11
+      rect:
+        serializedVersion: 2
+        x: 167
+        y: 121
+        width: 12
+        height: 15
+      alignment: 7
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 98e14819066b62ff0800000000000000
+      internalID: -61161019048452471
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    outline: []
+    customData: 
+    physicsShape: []
+    bones: []
+    spriteID: 5e97eb03825dee720800000000000000
+    internalID: 0
+    vertices: []
+    indices: 
+    edges: []
+    weights: []
+    secondaryTextures: []
+    spriteCustomMetadata:
+      entries: []
+    nameFileIdTable:
+      Kasshin_Death_0_0: -4359003750781787366
+      Kasshin_Death_0_1: 8482717531720775615
+      Kasshin_Death_0_10: 3911396291548875377
+      Kasshin_Death_0_11: -61161019048452471
+      Kasshin_Death_0_2: 9118767320134860451
+      Kasshin_Death_0_3: 8986227187365917854
+      Kasshin_Death_0_4: 7935165073625472993
+      Kasshin_Death_0_5: -6122636193404480311
+      Kasshin_Death_0_6: -1480651550013172069
+      Kasshin_Death_0_7: -6465109226285685308
+      Kasshin_Death_0_8: 4143237981060790851
+      Kasshin_Death_0_9: 2648235834913806478
+  mipmapLimitGroupName: 
+  pSDRemoveMatte: 0
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 

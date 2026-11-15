@@ -1,0 +1,21 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!221 &22100000
+AnimatorOverrideController:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: BeastTitan_Override
+  m_Controller: {fileID: 9100000, guid: 1d4b3e94ec7af2a4e91d9a058a2c3bc3, type: 2}
+  m_Clips:
+  - m_OriginalClip: {fileID: 7400000, guid: ef29b0d65b7e0aa44b9ee0aa7e855e03, type: 2}
+    m_OverrideClip: {fileID: 7400000, guid: 1867ead065577bb449d92a8f7682aedd, type: 2}
+  - m_OriginalClip: {fileID: 7400000, guid: 5e29bf9b614c9ff42be55b66891a024c, type: 2}
+    m_OverrideClip: {fileID: 7400000, guid: 744a9ce0d561d304497dd26e51b968da, type: 2}
+  - m_OriginalClip: {fileID: 7400000, guid: 3da7aedbb27cfc2429d886f2824d6612, type: 2}
+    m_OverrideClip: {fileID: 7400000, guid: 3307be6fd81671d4b933dbf36614de2d, type: 2}
+  - m_OriginalClip: {fileID: 7400000, guid: f8d749c4f76dc8e4d9a271f4cdda86ff, type: 2}
+    m_OverrideClip: {fileID: 7400000, guid: 1b7a76133ca34c84fbd526b86a13fd4b, type: 2}
+  - m_OriginalClip: {fileID: 7400000, guid: a56b8fd140b5b194d8892d03b2966357, type: 2}
+    m_OverrideClip: {fileID: 7400000, guid: d75ec9aba3ce8074bb7004d909918e7e, type: 2}

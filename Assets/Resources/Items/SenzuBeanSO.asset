@@ -1,0 +1,31 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d3d48d0e65a0f6042b9f23ba6c4eac7f, type: 3}
+  m_Name: SenzuBeanSO
+  m_EditorClassIdentifier: Assembly-CSharp::StickmanBeatEmUp.Items.ConsumableItemSO
+  itemType: 1
+  itemName: "\u0110\u1EADu Th\u1EA7n Senzu"
+  description: "H\u1ED3i ngay 50 HP t\u1EE9c th\xEC khi k\xEDch ho\u1EA1t."
+  price: 30
+  icon: {fileID: 21300000, guid: 17abedb77753c4c4c9bb29858c005047, type: 3}
+  vfxFrames:
+  - {fileID: 21300000, guid: 728eafa60abe5294780fc7fa20ea6de6, type: 3}
+  - {fileID: 21300000, guid: 9ea5f80e5583c124892c1862099827d8, type: 3}
+  - {fileID: 21300000, guid: 2fe5b687905f9b842a185b3196f0cfa4, type: 3}
+  vfxFps: 10
+  healAmount: 50
+  buffDuration: 0
+  shieldAmount: 0
+  reflectDamage: 0
+  damageMultiplier: 1
+  speedMultiplier: 1
+  ragePerSecond: 0

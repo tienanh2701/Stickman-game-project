@@ -1,0 +1,61 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 646303f0a24aa2948b0e1c2a37682c54, type: 3}
+  m_Name: Level_W3_S4
+  m_EditorClassIdentifier: Assembly-CSharp::StickmanBeatEmUp.Level.LevelDataSO
+  worldType: 2
+  stageNumber: 4
+  stageName: 'World 3 (Diend Neo Ruins) - Stage 4 [BOSS]'
+  lockTriggerX: 0.5
+  lockedCameraMinX: 1.5
+  lockedCameraMaxX: 15
+  waves:
+  - waveName: Wave 1 - 2 Melee + 1 Ranged
+    enemies:
+    - enemyPrefab: {fileID: 2656090470614941054, guid: 2e8e888a0047fe348a4699b948939f68, type: 3}
+      spawnOffset: {x: 4.8, y: 0}
+      spawnDelay: 0
+      maxHealthOverride: 0
+    - enemyPrefab: {fileID: 2656090470614941054, guid: 2e8e888a0047fe348a4699b948939f68, type: 3}
+      spawnOffset: {x: -4.8, y: 0}
+      spawnDelay: 0.28
+      maxHealthOverride: 0
+    - enemyPrefab: {fileID: 3169423737928849363, guid: b160f0ac3d0b98a47baf3f0b7c9cb690, type: 3}
+      spawnOffset: {x: 6.8, y: 0}
+      spawnDelay: 0.35
+      maxHealthOverride: 0
+    delayBeforeWave: 0.6
+  - waveName: Wave 2 - Vanguard Elite (35 HP) + 2 Melee
+    enemies:
+    - enemyPrefab: {fileID: 5186376028888817823, guid: 711ede894515c7f41b0a0ddf8b44c76e, type: 3}
+      spawnOffset: {x: 6, y: 0}
+      spawnDelay: 0
+      maxHealthOverride: 35
+    - enemyPrefab: {fileID: 2656090470614941054, guid: 2e8e888a0047fe348a4699b948939f68, type: 3}
+      spawnOffset: {x: 4.6, y: 0}
+      spawnDelay: 0.25
+      maxHealthOverride: 0
+    - enemyPrefab: {fileID: 2656090470614941054, guid: 2e8e888a0047fe348a4699b948939f68, type: 3}
+      spawnOffset: {x: -4.6, y: 0}
+      spawnDelay: 0.5
+      maxHealthOverride: 0
+    delayBeforeWave: 1
+  isBossStage: 1
+  bossPrefab: {fileID: 1715246435772682752, guid: 9c1f9f4d31f7f4843acfbe88552afc17, type: 3}
+  bossSpawnPosition: {x: 9.5, y: -2.5}
+  backgroundSprite: {fileID: 21300000, guid: c8407397bb03fe8429cf3f70a139a005, type: 3}
+  groundColor: {r: 0.26, g: 0.16, b: 0.21000001, a: 1}
+  enemyHpMultiplier: 1
+  enemyDamageMultiplier: 1
+  supportMeleeCreepPrefab: {fileID: 2656090470614941054, guid: 2e8e888a0047fe348a4699b948939f68, type: 3}
+  supportRangedCreepPrefab: {fileID: 3169423737928849363, guid: b160f0ac3d0b98a47baf3f0b7c9cb690, type: 3}
+  supportElitePrefab: {fileID: 5186376028888817823, guid: 711ede894515c7f41b0a0ddf8b44c76e, type: 3}

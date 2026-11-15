@@ -1,0 +1,21 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!221 &22100000
+AnimatorOverrideController:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: Shocker_Override
+  m_Controller: {fileID: 9100000, guid: 1d4b3e94ec7af2a4e91d9a058a2c3bc3, type: 2}
+  m_Clips:
+  - m_OriginalClip: {fileID: 7400000, guid: ef29b0d65b7e0aa44b9ee0aa7e855e03, type: 2}
+    m_OverrideClip: {fileID: 7400000, guid: 83dae380d846e2940ac244c1a9b11ccc, type: 2}
+  - m_OriginalClip: {fileID: 7400000, guid: 5e29bf9b614c9ff42be55b66891a024c, type: 2}
+    m_OverrideClip: {fileID: 7400000, guid: d9b079b33e3bbf04bb4a583de3f0436d, type: 2}
+  - m_OriginalClip: {fileID: 7400000, guid: 3da7aedbb27cfc2429d886f2824d6612, type: 2}
+    m_OverrideClip: {fileID: 7400000, guid: 7548177666a58c4448c97489b51e9403, type: 2}
+  - m_OriginalClip: {fileID: 7400000, guid: f8d749c4f76dc8e4d9a271f4cdda86ff, type: 2}
+    m_OverrideClip: {fileID: 7400000, guid: 4792464f3024753479a3d5eb33e879e8, type: 2}
+  - m_OriginalClip: {fileID: 7400000, guid: a56b8fd140b5b194d8892d03b2966357, type: 2}
+    m_OverrideClip: {fileID: 7400000, guid: 8b457f481b746d548b1f46f429869d75, type: 2}

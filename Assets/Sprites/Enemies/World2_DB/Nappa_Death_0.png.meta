@@ -1,0 +1,650 @@
+fileFormatVersion: 2
+guid: 0316bfa318029d74e8263652d2e7e24c
+TextureImporter:
+  internalIDToNameTable:
+  - first:
+      213: 3287694445494497156
+    second: Nappa_Death_0_0
+  - first:
+      213: -7829951210093105317
+    second: Nappa_Death_0_1
+  - first:
+      213: -2486080060565676368
+    second: Nappa_Death_0_2
+  - first:
+      213: 3858123168518152006
+    second: Nappa_Death_0_3
+  - first:
+      213: -707437631511063066
+    second: Nappa_Death_0_4
+  - first:
+      213: -3043774396589409943
+    second: Nappa_Death_0_5
+  - first:
+      213: -3827628078712465070
+    second: Nappa_Death_0_6
+  - first:
+      213: 4466406355499270213
+    second: Nappa_Death_0_7
+  - first:
+      213: 8270950446185019183
+    second: Nappa_Death_0_8
+  - first:
+      213: -5414970945108210827
+    second: Nappa_Death_0_9
+  - first:
+      213: 3888499420559330383
+    second: Nappa_Death_0_10
+  - first:
+      213: -4793202878922944527
+    second: Nappa_Death_0_11
+  - first:
+      213: 5005731510560295837
+    second: Nappa_Death_0_12
+  - first:
+      213: -72644735589853297
+    second: Nappa_Death_0_13
+  - first:
+      213: 2505888171299179028
+    second: Nappa_Death_0_14
+  - first:
+      213: 11765137005920769
+    second: Nappa_Death_0_15
+  - first:
+      213: -452802898108614025
+    second: Nappa_Death_0_16
+  - first:
+      213: 6765145511338605093
+    second: Nappa_Death_0_17
+  - first:
+      213: 1477189181951741536
+    second: Nappa_Death_0_18
+  - first:
+      213: -4052417896748683360
+    second: Nappa_Death_0_19
+  externalObjects: {}
+  serializedVersion: 13
+  mipmaps:
+    mipMapMode: 0
+    enableMipMap: 0
+    sRGBTexture: 1
+    linearTexture: 0
+    fadeOut: 0
+    borderMipMap: 0
+    mipMapsPreserveCoverage: 0
+    alphaTestReferenceValue: 0.5
+    mipMapFadeDistanceStart: 1
+    mipMapFadeDistanceEnd: 3
+  bumpmap:
+    convertToNormalMap: 0
+    externalNormalMap: 0
+    heightScale: 0.25
+    normalMapFilter: 0
+    flipGreenChannel: 0
+  isReadable: 0
+  streamingMipmaps: 0
+  streamingMipmapsPriority: 0
+  vTOnly: 0
+  ignoreMipmapLimit: 0
+  grayScaleToAlpha: 0
+  generateCubemap: 6
+  cubemapConvolution: 0
+  seamlessCubemap: 0
+  textureFormat: 1
+  maxTextureSize: 2048
+  textureSettings:
+    serializedVersion: 2
+    filterMode: 1
+    aniso: 1
+    mipBias: 0
+    wrapU: 1
+    wrapV: 1
+    wrapW: 1
+  nPOTScale: 0
+  lightmap: 0
+  compressionQuality: 50
+  spriteMode: 1
+  spriteExtrude: 1
+  spriteMeshType: 1
+  alignment: 7
+  spritePivot: {x: 0.5, y: 0}
+  spritePixelsToUnits: 160
+  spriteBorder: {x: 0, y: 0, z: 0, w: 0}
+  spriteGenerateFallbackPhysicsShape: 1
+  alphaUsage: 1
+  alphaIsTransparency: 1
+  spriteTessellationDetail: -1
+  textureType: 8
+  textureShape: 1
+  singleChannelComponent: 0
+  flipbookRows: 1
+  flipbookColumns: 1
+  maxTextureSizeSet: 0
+  compressionQualitySet: 0
+  textureFormatSet: 0
+  ignorePngGamma: 0
+  applyGammaDecoding: 0
+  swizzle: 50462976
+  cookieLightType: 0
+  platformSettings:
+  - serializedVersion: 4
+    buildTarget: DefaultTexturePlatform
+    maxTextureSize: 4096
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 0
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 4
+    buildTarget: Standalone
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 4
+    buildTarget: WebGL
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  spriteSheet:
+    serializedVersion: 2
+    sprites:
+    - serializedVersion: 2
+      name: Nappa_Death_0_0
+      rect:
+        serializedVersion: 2
+        x: 68
+        y: 173
+        width: 12
+        height: 13
+      alignment: 7
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 48f69b1edac30ad20800000000000000
+      internalID: 3287694445494497156
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Nappa_Death_0_1
+      rect:
+        serializedVersion: 2
+        x: 87
+        y: 185
+        width: 11
+        height: 17
+      alignment: 7
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: b5fa2c9fbdc665390800000000000000
+      internalID: -7829951210093105317
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Nappa_Death_0_2
+      rect:
+        serializedVersion: 2
+        x: 189
+        y: 165
+        width: 30
+        height: 30
+      alignment: 7
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 0be1dc25b5baf7dd0800000000000000
+      internalID: -2486080060565676368
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Nappa_Death_0_3
+      rect:
+        serializedVersion: 2
+        x: 90
+        y: 162
+        width: 12
+        height: 11
+      alignment: 7
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 64f9a3f949eca8530800000000000000
+      internalID: 3858123168518152006
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Nappa_Death_0_4
+      rect:
+        serializedVersion: 2
+        x: 115
+        y: 129
+        width: 44
+        height: 40
+      alignment: 7
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 6e51a09e83dae26f0800000000000000
+      internalID: -707437631511063066
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Nappa_Death_0_5
+      rect:
+        serializedVersion: 2
+        x: 193
+        y: 114
+        width: 17
+        height: 52
+      alignment: 7
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 969fbda105752c5d0800000000000000
+      internalID: -3043774396589409943
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Nappa_Death_0_6
+      rect:
+        serializedVersion: 2
+        x: 58
+        y: 145
+        width: 13
+        height: 16
+      alignment: 7
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 2595804ca8881eac0800000000000000
+      internalID: -3827628078712465070
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Nappa_Death_0_7
+      rect:
+        serializedVersion: 2
+        x: 164
+        y: 154
+        width: 6
+        height: 6
+      alignment: 7
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 540c4129aecdbfd30800000000000000
+      internalID: 4466406355499270213
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Nappa_Death_0_8
+      rect:
+        serializedVersion: 2
+        x: 28
+        y: 120
+        width: 9
+        height: 15
+      alignment: 7
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: f2777b30c9158c270800000000000000
+      internalID: 8270950446185019183
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Nappa_Death_0_9
+      rect:
+        serializedVersion: 2
+        x: 33
+        y: 99
+        width: 21
+        height: 27
+      alignment: 7
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 57b83cb7d982ad4b0800000000000000
+      internalID: -5414970945108210827
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Nappa_Death_0_10
+      rect:
+        serializedVersion: 2
+        x: 67
+        y: 125
+        width: 13
+        height: 12
+      alignment: 7
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: f4c40cfee99b6f530800000000000000
+      internalID: 3888499420559330383
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Nappa_Death_0_11
+      rect:
+        serializedVersion: 2
+        x: 84
+        y: 94
+        width: 41
+        height: 58
+      alignment: 7
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 1ff0b69806f1b7db0800000000000000
+      internalID: -4793202878922944527
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Nappa_Death_0_12
+      rect:
+        serializedVersion: 2
+        x: 115
+        y: 113
+        width: 13
+        height: 22
+      alignment: 7
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: d9b0def894ee77540800000000000000
+      internalID: 5005731510560295837
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Nappa_Death_0_13
+      rect:
+        serializedVersion: 2
+        x: 126
+        y: 105
+        width: 16
+        height: 33
+      alignment: 7
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: f875d547ff9edfef0800000000000000
+      internalID: -72644735589853297
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Nappa_Death_0_14
+      rect:
+        serializedVersion: 2
+        x: 158
+        y: 123
+        width: 17
+        height: 20
+      alignment: 7
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 41a0429d304b6c220800000000000000
+      internalID: 2505888171299179028
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Nappa_Death_0_15
+      rect:
+        serializedVersion: 2
+        x: 218
+        y: 94
+        width: 10
+        height: 40
+      alignment: 7
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 102c8fb645cc92000800000000000000
+      internalID: 11765137005920769
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Nappa_Death_0_16
+      rect:
+        serializedVersion: 2
+        x: 232
+        y: 94
+        width: 40
+        height: 51
+      alignment: 7
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 77af7f8c92257b9f0800000000000000
+      internalID: -452802898108614025
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Nappa_Death_0_17
+      rect:
+        serializedVersion: 2
+        x: 28
+        y: 15
+        width: 235
+        height: 94
+      alignment: 7
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 52a7a21dfff92ed50800000000000000
+      internalID: 6765145511338605093
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Nappa_Death_0_18
+      rect:
+        serializedVersion: 2
+        x: 141
+        y: 102
+        width: 13
+        height: 16
+      alignment: 7
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 06e88480cb7008410800000000000000
+      internalID: 1477189181951741536
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Nappa_Death_0_19
+      rect:
+        serializedVersion: 2
+        x: 169
+        y: 102
+        width: 22
+        height: 21
+      alignment: 7
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 0afebdeb46be2c7c0800000000000000
+      internalID: -4052417896748683360
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    outline: []
+    customData: 
+    physicsShape: []
+    bones: []
+    spriteID: 5e97eb03825dee720800000000000000
+    internalID: 0
+    vertices: []
+    indices: 
+    edges: []
+    weights: []
+    secondaryTextures: []
+    spriteCustomMetadata:
+      entries: []
+    nameFileIdTable:
+      Nappa_Death_0_0: 3287694445494497156
+      Nappa_Death_0_1: -7829951210093105317
+      Nappa_Death_0_10: 3888499420559330383
+      Nappa_Death_0_11: -4793202878922944527
+      Nappa_Death_0_12: 5005731510560295837
+      Nappa_Death_0_13: -72644735589853297
+      Nappa_Death_0_14: 2505888171299179028
+      Nappa_Death_0_15: 11765137005920769
+      Nappa_Death_0_16: -452802898108614025
+      Nappa_Death_0_17: 6765145511338605093
+      Nappa_Death_0_18: 1477189181951741536
+      Nappa_Death_0_19: -4052417896748683360
+      Nappa_Death_0_2: -2486080060565676368
+      Nappa_Death_0_3: 3858123168518152006
+      Nappa_Death_0_4: -707437631511063066
+      Nappa_Death_0_5: -3043774396589409943
+      Nappa_Death_0_6: -3827628078712465070
+      Nappa_Death_0_7: 4466406355499270213
+      Nappa_Death_0_8: 8270950446185019183
+      Nappa_Death_0_9: -5414970945108210827
+  mipmapLimitGroupName: 
+  pSDRemoveMatte: 0
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
