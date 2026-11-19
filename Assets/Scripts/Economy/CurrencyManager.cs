@@ -21,7 +21,7 @@ namespace StickmanBeatEmUp.Economy
 
         [SerializeField] private int currentCoins;
 
-        public static bool HasInstance => instance != null;
+        public static bool HasInstance => !isApplicationQuitting && instance != null;
 
         public static CurrencyManager Instance
         {
@@ -174,6 +174,15 @@ namespace StickmanBeatEmUp.Economy
         {
             currentCoins = 0;
             SaveCoins();
+            OnCoinsChanged?.Invoke(currentCoins);
+        }
+
+        /// <summary>
+        /// Nạp lại số Xu từ PlayerPrefs (khi chuyển/đăng xuất tài khoản hoặc reset test) và phát OnCoinsChanged.
+        /// </summary>
+        public void ReloadProfileState()
+        {
+            LoadCoins();
             OnCoinsChanged?.Invoke(currentCoins);
         }
 

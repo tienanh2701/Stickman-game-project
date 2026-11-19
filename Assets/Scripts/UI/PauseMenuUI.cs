@@ -1,3 +1,5 @@
+using System.Collections;
+using TMPro;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
@@ -13,13 +15,16 @@ using StickmanBeatEmUp.Level;
 namespace StickmanBeatEmUp.UI
 {
     /// <summary>
-    /// Quản lý menu Tạm Dừng (Pause) trong trận đấu:
+    /// Quản lý menu Tạm Dừng (Pause) trong trận đấu dạng Floating Dark Glassmorphism Modal:
     /// - Kích hoạt qua nút [ || TẠM DỪNG ] trên HUD hoặc phím Escape (InputHandler.OnPauseEvent)
-    /// - 3 nút: "TIẾP TỤC", "CHƠI LẠI" (không hoàn lại Q/E), "THOÁT RA MENU"
+    /// - 3 nút pill: "TIẾP TỤC", "CHƠI LẠI" (không hoàn lại Q/E), "VỀ MENU"
     /// - Đảm bảo Time.timeScale = 1f khi tiếp tục, chơi lại, thoát hoặc OnDestroy.
     /// </summary>
     public class PauseMenuUI : MonoBehaviour
     {
+        private const float POP_IN_DURATION = 0.14f;
+        private const float POP_IN_START_SCALE = 0.90f;
+
         [Header("Pause Modal & Buttons")]
         [SerializeField] private GameObject pauseModalPanel;
         [SerializeField] private Button pauseHudButton;
@@ -35,6 +40,11 @@ namespace StickmanBeatEmUp.UI
         private bool isLevelSubscribed;
         private int lastToggleFrame = -1;
         private float nextInputLookupTime;
+
+        private RectTransform pauseBoxRect;
+        private CanvasGroup pauseBoxCanvasGroup;
+        private Image pauseBoxImage;
+        private Coroutine popInCoroutine;
 
         public bool IsPaused => isPaused;
 
@@ -52,6 +62,8 @@ namespace StickmanBeatEmUp.UI
             exitMenuButton = exitMenuBtn;
 
             WireButtons();
+            ApplyGlassModalTheme();
+
             if (pauseModalPanel != null)
             {
                 pauseModalPanel.SetActive(isPaused);
@@ -89,6 +101,9 @@ namespace StickmanBeatEmUp.UI
                 }
             }
 
+            bool wasPaused = isPaused;
+            bool wasPanelActive = pauseModalPanel != null && pauseModalPanel.activeSelf;
+
             isPaused = paused;
             Time.timeScale = isPaused ? 0f : 1f;
 
@@ -96,11 +111,98 @@ namespace StickmanBeatEmUp.UI
             {
                 pauseModalPanel.SetActive(isPaused);
             }
+
+            if (isPaused)
+            {
+                if (pauseBoxImage == null || pauseBoxImage.sprite == null)
+                {
+                    ApplyGlassModalTheme();
+                }
+
+                if (!wasPaused || !wasPanelActive)
+                {
+                    PlayPauseBoxPopIn();
+                }
+            }
+            else
+            {
+                StopPauseBoxPopInAndReset();
+            }
+        }
+
+        public void ApplyGlassModalTheme()
+        {
+            if (pauseModalPanel == null)
+            {
+                Transform foundPanel = transform.Find("PauseModalPanel");
+                if (foundPanel != null)
+                {
+                    pauseModalPanel = foundPanel.gameObject;
+                }
+            }
+
+            if (pauseModalPanel == null) return;
+
+            Image dimImg = pauseModalPanel.GetComponent<Image>();
+            if (dimImg != null)
+            {
+                dimImg.sprite = null;
+                dimImg.type = Image.Type.Simple;
+                dimImg.color = new Color(0.02f, 0.04f, 0.08f, 0.56f);
+                dimImg.raycastTarget = true;
+            }
+
+            Transform boxTr = ResolvePauseBoxTransform();
+            if (boxTr == null) return;
+
+            pauseBoxRect = boxTr.GetComponent<RectTransform>();
+            if (pauseBoxRect != null)
+            {
+                pauseBoxRect.anchorMin = new Vector2(0.5f, 0.5f);
+                pauseBoxRect.anchorMax = new Vector2(0.5f, 0.5f);
+                pauseBoxRect.pivot = new Vector2(0.5f, 0.5f);
+                pauseBoxRect.anchoredPosition = Vector2.zero;
+                pauseBoxRect.sizeDelta = new Vector2(540f, 430f);
+            }
+
+            RemoveFlatOutlines(boxTr.gameObject);
+
+            pauseBoxImage = boxTr.GetComponent<Image>();
+            if (pauseBoxImage == null)
+            {
+                pauseBoxImage = boxTr.gameObject.AddComponent<Image>();
+            }
+            Sprite boxSp = GlassHudTheme.LoadSprite("ModalCard_DarkGlass_Cyan.png");
+            if (boxSp != null)
+            {
+                GlassHudTheme.ApplySlicedSprite(pauseBoxImage, boxSp, 540f, 430f, Color.white);
+            }
+            else
+            {
+                pauseBoxImage.color = new Color(0.06f, 0.11f, 0.19f, 0.94f);
+            }
+            pauseBoxImage.raycastTarget = true;
+
+            pauseBoxCanvasGroup = boxTr.GetComponent<CanvasGroup>();
+            if (pauseBoxCanvasGroup == null)
+            {
+                pauseBoxCanvasGroup = boxTr.gameObject.AddComponent<CanvasGroup>();
+            }
+            pauseBoxCanvasGroup.interactable = true;
+            pauseBoxCanvasGroup.blocksRaycasts = true;
+
+            StylePauseTitle(boxTr);
+            EnsurePauseDivider(boxTr);
+
+            StylePauseButton(resumeButton, boxTr, "PillBtn_OrangePrimary.png", "TIẾP TỤC", 38f);
+            StylePauseButton(retryButton, boxTr, "PillBtn_GlassNeutral.png", "CHƠI LẠI", -46f);
+            StylePauseButton(exitMenuButton, boxTr, "PillBtn_RedDanger.png", "VỀ MENU", -130f);
         }
 
         private void Awake()
         {
             WireButtons();
+            ApplyGlassModalTheme();
             if (pauseModalPanel != null)
             {
                 pauseModalPanel.SetActive(false);
@@ -117,6 +219,7 @@ namespace StickmanBeatEmUp.UI
         private void Start()
         {
             WireButtons();
+            ApplyGlassModalTheme();
             SubscribeLevelEvents();
             TryBindActiveInputHandler();
 
@@ -147,16 +250,297 @@ namespace StickmanBeatEmUp.UI
 
         private void OnDisable()
         {
+            StopPauseBoxPopInAndReset();
+            if (isPaused)
+            {
+                isPaused = false;
+                Time.timeScale = 1f;
+                if (pauseModalPanel != null && pauseModalPanel != gameObject)
+                {
+                    pauseModalPanel.SetActive(false);
+                }
+            }
             UnbindInputHandler();
             UnsubscribeLevelEvents();
         }
 
         private void OnDestroy()
         {
+            StopPauseBoxPopInAndReset();
             Time.timeScale = 1f;
             isPaused = false;
             UnbindInputHandler();
             UnsubscribeLevelEvents();
+        }
+
+        private Transform ResolvePauseBoxTransform()
+        {
+            if (pauseModalPanel == null) return null;
+
+            Transform byName = pauseModalPanel.transform.Find("PauseBox");
+            if (byName != null) return byName;
+
+            if (resumeButton != null && resumeButton.transform.parent != null &&
+                resumeButton.transform.parent != pauseModalPanel.transform)
+            {
+                return resumeButton.transform.parent;
+            }
+
+            for (int i = 0; i < pauseModalPanel.transform.childCount; i++)
+            {
+                Transform child = pauseModalPanel.transform.GetChild(i);
+                if (child != null && child.GetComponent<Image>() != null)
+                {
+                    return child;
+                }
+            }
+
+            return null;
+        }
+
+        private void StylePauseTitle(Transform boxTr)
+        {
+            Transform titleTr = boxTr.Find("PauseTitle");
+            if (titleTr == null && pauseModalPanel != null)
+            {
+                titleTr = pauseModalPanel.transform.Find("PauseTitle");
+            }
+            if (titleTr == null)
+            {
+                TMP_Text[] candidateTexts = boxTr.GetComponentsInChildren<TMP_Text>(true);
+                for (int i = 0; i < candidateTexts.Length; i++)
+                {
+                    if (candidateTexts[i] != null &&
+                        candidateTexts[i].gameObject.name.IndexOf("Title", System.StringComparison.OrdinalIgnoreCase) >= 0)
+                    {
+                        titleTr = candidateTexts[i].transform;
+                        break;
+                    }
+                }
+            }
+
+            if (titleTr == null) return;
+            if (titleTr.parent != boxTr)
+            {
+                titleTr.SetParent(boxTr, false);
+            }
+
+            RectTransform titleRt = titleTr.GetComponent<RectTransform>();
+            if (titleRt != null)
+            {
+                titleRt.anchorMin = new Vector2(0.5f, 0.5f);
+                titleRt.anchorMax = new Vector2(0.5f, 0.5f);
+                titleRt.pivot = new Vector2(0.5f, 0.5f);
+                titleRt.anchoredPosition = new Vector2(0f, 148f);
+                titleRt.sizeDelta = new Vector2(460f, 64f);
+            }
+
+            TMP_Text titleTmp = titleTr.GetComponent<TMP_Text>();
+            if (titleTmp != null)
+            {
+                titleTmp.text = "TẠM DỪNG";
+                titleTmp.alignment = TextAlignmentOptions.Center;
+                titleTmp.raycastTarget = false;
+                GlassHudTheme.StyleTmpText(titleTmp, 44f, new Color(1f, 0.90f, 0.42f, 1f), true, true);
+            }
+        }
+
+        private static void EnsurePauseDivider(Transform boxTr)
+        {
+            Transform divTr = boxTr.Find("PauseDivider");
+            if (divTr == null)
+            {
+                GameObject divObj = new GameObject("PauseDivider", typeof(RectTransform), typeof(Image));
+                divObj.transform.SetParent(boxTr, false);
+                divTr = divObj.transform;
+            }
+
+            RectTransform divRt = divTr.GetComponent<RectTransform>();
+            if (divRt != null)
+            {
+                divRt.anchorMin = new Vector2(0.5f, 0.5f);
+                divRt.anchorMax = new Vector2(0.5f, 0.5f);
+                divRt.pivot = new Vector2(0.5f, 0.5f);
+                divRt.anchoredPosition = new Vector2(0f, 98f);
+                divRt.sizeDelta = new Vector2(420f, 1.5f);
+            }
+
+            Image divImg = divTr.GetComponent<Image>();
+            if (divImg != null)
+            {
+                divImg.sprite = null;
+                divImg.type = Image.Type.Simple;
+                divImg.color = new Color(0.70f, 0.94f, 1f, 0.25f);
+                divImg.raycastTarget = false;
+            }
+        }
+
+        private static void StylePauseButton(Button btn, Transform boxTr, string spriteFileName, string labelText, float yPos)
+        {
+            if (btn == null || boxTr == null) return;
+
+            if (btn.transform.parent != boxTr)
+            {
+                btn.transform.SetParent(boxTr, false);
+            }
+
+            RemoveFlatOutlines(btn.gameObject);
+
+            RectTransform rt = btn.GetComponent<RectTransform>();
+            if (rt != null)
+            {
+                rt.anchorMin = new Vector2(0.5f, 0.5f);
+                rt.anchorMax = new Vector2(0.5f, 0.5f);
+                rt.pivot = new Vector2(0.5f, 0.5f);
+                rt.anchoredPosition = new Vector2(0f, yPos);
+                rt.sizeDelta = new Vector2(360f, 66f);
+            }
+
+            Image img = btn.GetComponent<Image>();
+            if (img != null)
+            {
+                Sprite btnSp = GlassHudTheme.LoadSprite(spriteFileName);
+                if (btnSp != null)
+                {
+                    GlassHudTheme.ApplySlicedSprite(img, btnSp, 360f, 66f, Color.white);
+                }
+                img.raycastTarget = true;
+                btn.targetGraphic = img;
+            }
+
+            btn.transition = Selectable.Transition.ColorTint;
+            ColorBlock cb = btn.colors;
+            cb.normalColor = Color.white;
+            cb.highlightedColor = new Color(0.93f, 0.97f, 1f, 1f);
+            cb.pressedColor = new Color(0.76f, 0.81f, 0.88f, 1f);
+            cb.selectedColor = Color.white;
+            cb.disabledColor = new Color(0.6f, 0.6f, 0.6f, 0.6f);
+            cb.colorMultiplier = 1f;
+            cb.fadeDuration = 0.08f;
+            btn.colors = cb;
+
+            TMP_Text label = btn.GetComponentInChildren<TMP_Text>(true);
+            if (label != null)
+            {
+                label.text = labelText;
+                label.alignment = TextAlignmentOptions.Center;
+                label.raycastTarget = false;
+
+                RectTransform labelRt = label.GetComponent<RectTransform>();
+                if (labelRt != null)
+                {
+                    labelRt.anchorMin = Vector2.zero;
+                    labelRt.anchorMax = Vector2.one;
+                    labelRt.offsetMin = new Vector2(14f, 0f);
+                    labelRt.offsetMax = new Vector2(-14f, 0f);
+                }
+
+                GlassHudTheme.StyleTmpText(label, 24f, Color.white, true, true);
+            }
+        }
+
+        private static void RemoveFlatOutlines(GameObject go)
+        {
+            if (go == null) return;
+            Outline[] outlines = go.GetComponents<Outline>();
+            for (int i = 0; i < outlines.Length; i++)
+            {
+                if (outlines[i] == null) continue;
+                outlines[i].enabled = false;
+                if (Application.isPlaying)
+                {
+                    Destroy(outlines[i]);
+                }
+                else
+                {
+                    DestroyImmediate(outlines[i]);
+                }
+            }
+        }
+
+        private void PlayPauseBoxPopIn()
+        {
+            if (pauseBoxRect == null) return;
+
+            pauseBoxRect.gameObject.SetActive(true);
+            if (popInCoroutine != null)
+            {
+                StopCoroutine(popInCoroutine);
+                popInCoroutine = null;
+            }
+
+            if (!Application.isPlaying || !isActiveAndEnabled || !gameObject.activeInHierarchy)
+            {
+                pauseBoxRect.localScale = Vector3.one;
+                if (pauseBoxCanvasGroup != null) pauseBoxCanvasGroup.alpha = 1f;
+                return;
+            }
+
+            popInCoroutine = StartCoroutine(AnimatePauseBoxPopIn());
+        }
+
+        private void StopPauseBoxPopInAndReset()
+        {
+            if (popInCoroutine != null)
+            {
+                StopCoroutine(popInCoroutine);
+                popInCoroutine = null;
+            }
+
+            if (pauseBoxRect != null)
+            {
+                pauseBoxRect.localScale = Vector3.one;
+            }
+            if (pauseBoxCanvasGroup != null)
+            {
+                pauseBoxCanvasGroup.alpha = 1f;
+            }
+        }
+
+        private IEnumerator AnimatePauseBoxPopIn()
+        {
+            if (pauseBoxRect == null)
+            {
+                popInCoroutine = null;
+                yield break;
+            }
+
+            pauseBoxRect.localScale = new Vector3(POP_IN_START_SCALE, POP_IN_START_SCALE, 1f);
+            if (pauseBoxCanvasGroup != null)
+            {
+                pauseBoxCanvasGroup.alpha = 0f;
+            }
+
+            float elapsed = 0f;
+            while (elapsed < POP_IN_DURATION)
+            {
+                elapsed += Time.unscaledDeltaTime;
+                float t = Mathf.Clamp01(elapsed / POP_IN_DURATION);
+                float eased = 1f - Mathf.Pow(1f - t, 3f);
+                float scale = Mathf.Lerp(POP_IN_START_SCALE, 1f, eased);
+
+                if (pauseBoxRect != null)
+                {
+                    pauseBoxRect.localScale = new Vector3(scale, scale, 1f);
+                }
+                if (pauseBoxCanvasGroup != null)
+                {
+                    pauseBoxCanvasGroup.alpha = eased;
+                }
+
+                yield return null;
+            }
+
+            if (pauseBoxRect != null)
+            {
+                pauseBoxRect.localScale = Vector3.one;
+            }
+            if (pauseBoxCanvasGroup != null)
+            {
+                pauseBoxCanvasGroup.alpha = 1f;
+            }
+
+            popInCoroutine = null;
         }
 
         private void WireButtons()
@@ -259,6 +643,7 @@ namespace StickmanBeatEmUp.UI
 
         private void HandleRetryClicked()
         {
+            StopPauseBoxPopInAndReset();
             isPaused = false;
             Time.timeScale = 1f;
 
@@ -279,6 +664,7 @@ namespace StickmanBeatEmUp.UI
 
         private void HandleExitToMenuClicked()
         {
+            StopPauseBoxPopInAndReset();
             isPaused = false;
             Time.timeScale = 1f;
 

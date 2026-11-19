@@ -37,7 +37,7 @@ namespace StickmanBeatEmUp.Items
 
         private bool isInitialized;
 
-        public static bool HasInstance => instance != null;
+        public static bool HasInstance => !isApplicationQuitting && instance != null;
 
         public static InventoryManager Instance
         {
@@ -352,6 +352,20 @@ namespace StickmanBeatEmUp.Items
             PlayerPrefs.SetInt(GetSlotPrefKey(SLOT_E), (int)equippedSlots[SLOT_E]);
             PlayerPrefs.Save();
 
+            OnInventoryChanged?.Invoke();
+        }
+
+        /// <summary>
+        /// Nạp lại kho vật phẩm và 2 ô trang bị Q/E từ PlayerPrefs và phát OnInventoryChanged.
+        /// </summary>
+        public void ReloadProfileState()
+        {
+            if (!isInitialized)
+            {
+                BuildCatalog();
+                isInitialized = true;
+            }
+            LoadInventoryAndSlots();
             OnInventoryChanged?.Invoke();
         }
 

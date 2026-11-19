@@ -21,6 +21,10 @@ namespace StickmanBeatEmUp.UI
         [SerializeField] private RectTransform flyOverlayLayer;
         [SerializeField] private Sprite coinOrbSprite;
 
+        [Header("SlicedUI Sprites")]
+        [SerializeField] private Sprite battleBadgeSprite;
+        [SerializeField] private Sprite battleCoinIconSprite;
+
         [Header("Animation Settings")]
         [SerializeField] private float countDuration = 0.45f;
         [SerializeField] private float flyDuration = 0.45f;
@@ -39,6 +43,15 @@ namespace StickmanBeatEmUp.UI
 
         private static Sprite fallbackCircleSprite;
 
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetStatics()
+        {
+            fallbackCircleSprite = null;
+        }
+
+        public TMP_Text CoinLabel => coinLabel;
+        public Image CoinIcon => coinIcon;
+
         public void Configure(
             TMP_Text label,
             Image icon,
@@ -53,10 +66,10 @@ namespace StickmanBeatEmUp.UI
             coinOrbSprite = orbSprite;
 
             CaptureBaseIconScale();
-            if (coinIcon != null && coinIcon.sprite == null && orbSprite != null)
+            EnsureCoinSprite();
+            if (Application.isPlaying && IsBattleCoinBadge())
             {
-                coinIcon.sprite = orbSprite;
-                coinIcon.preserveAspect = true;
+                ApplyBattleGlassTheme();
             }
 
             SyncImmediate();
@@ -76,13 +89,98 @@ namespace StickmanBeatEmUp.UI
             coinOrbSprite = orbSprite;
 
             CaptureBaseIconScale();
-            if (coinIcon != null && coinIcon.sprite == null && orbSprite != null)
-            {
-                coinIcon.sprite = orbSprite;
-                coinIcon.preserveAspect = true;
-            }
+            EnsureCoinSprite();
 
             SyncImmediate();
+        }
+
+        public void ApplyBattleGlassTheme()
+        {
+            if (transform is RectTransform rt)
+            {
+                rt.anchorMin = new Vector2(1f, 1f);
+                rt.anchorMax = new Vector2(1f, 1f);
+                rt.pivot = new Vector2(1f, 1f);
+                rt.anchoredPosition = new Vector2(-308f, -22f);
+                rt.sizeDelta = new Vector2(156f, 44f);
+            }
+
+            if (TryGetComponent(out Image badgeBg))
+            {
+                badgeBg.raycastTarget = false;
+                Sprite badgeSp = battleBadgeSprite != null
+                    ? battleBadgeSprite
+                    : GlassHudTheme.LoadSprite("08_BattleTopHUD/Badge_HUD_InGameCoin_Clean.png");
+                if (battleBadgeSprite == null && badgeSp != null)
+                {
+                    battleBadgeSprite = badgeSp;
+                }
+
+                if (badgeSp != null)
+                {
+                    GlassHudTheme.ApplySlicedSprite(badgeBg, badgeSp, 156f, 44f, Color.white);
+                }
+                else
+                {
+                    GlassHudTheme.ApplySprite(badgeBg, "CurrencyBadge_GoldGlass.png", default, true, false);
+                }
+            }
+
+            if (coinIcon == null)
+            {
+                Transform iconTr = transform.Find("CoinIcon");
+                if (iconTr != null) coinIcon = iconTr.GetComponent<Image>();
+            }
+            EnsureCoinSprite();
+
+            if (coinIcon != null)
+            {
+                RectTransform iconRt = coinIcon.rectTransform;
+                iconRt.anchorMin = new Vector2(0f, 0.5f);
+                iconRt.anchorMax = new Vector2(0f, 0.5f);
+                iconRt.pivot = new Vector2(0.5f, 0.5f);
+                iconRt.anchoredPosition = new Vector2(22f, 0f);
+                iconRt.sizeDelta = new Vector2(24f, 24f);
+                coinIcon.color = Color.white;
+                coinIcon.preserveAspect = true;
+                coinIcon.raycastTarget = false;
+            }
+
+            if (coinLabel == null)
+            {
+                coinLabel = GetComponentInChildren<TMP_Text>(true);
+            }
+            if (coinLabel != null)
+            {
+                RectTransform lblRt = coinLabel.rectTransform;
+                lblRt.anchorMin = Vector2.zero;
+                lblRt.anchorMax = Vector2.one;
+                lblRt.offsetMin = new Vector2(38f, 0f);
+                lblRt.offsetMax = new Vector2(-12f, 0f);
+                coinLabel.alignment = TextAlignmentOptions.MidlineRight;
+                coinLabel.textWrappingMode = TextWrappingModes.NoWrap;
+                coinLabel.enableAutoSizing = true;
+                coinLabel.fontSizeMin = 12f;
+                coinLabel.fontSizeMax = 18.5f;
+                coinLabel.raycastTarget = false;
+                GlassHudTheme.StyleTmpText(coinLabel, 18f, new Color(1f, 0.847f, 0.302f, 1f), true, true);
+            }
+        }
+
+        public void ApplyMainMenuContextTheme(Sprite badgeSprite)
+        {
+            if (badgeSprite != null && TryGetComponent(out Image badgeBg))
+            {
+                RectTransform rt = transform as RectTransform;
+                float w = rt != null ? Mathf.Abs(rt.sizeDelta.x) : 246f;
+                float h = rt != null ? Mathf.Abs(rt.sizeDelta.y) : 62f;
+                GlassHudTheme.ApplySlicedSprite(badgeBg, badgeSprite, w, h, Color.white);
+            }
+
+            if (coinLabel != null)
+            {
+                GlassHudTheme.StyleTmpText(coinLabel, -1f, null, true, true);
+            }
         }
 
         public void RefreshImmediate()
@@ -97,14 +195,61 @@ namespace StickmanBeatEmUp.UI
 
         private void OnEnable()
         {
+            EnsureCoinSprite();
             SubscribeToCurrency();
             SyncImmediate();
         }
 
         private void Start()
         {
+            EnsureCoinSprite();
+            if (IsBattleCoinBadge())
+            {
+                ApplyBattleGlassTheme();
+            }
             SubscribeToCurrency();
             SyncImmediate();
+        }
+
+        private bool IsBattleCoinBadge()
+        {
+            return string.Equals(gameObject.name, "BattleCoinBadge", System.StringComparison.Ordinal);
+        }
+
+        private void EnsureCoinSprite()
+        {
+            bool isBattle = IsBattleCoinBadge();
+            Sprite resolvedCoin = isBattle
+                ? (battleCoinIconSprite != null
+                    ? battleCoinIconSprite
+                    : (GlassHudTheme.LoadSprite("02_ModeSelect/Icon_Currency_CoinXu.png")
+                       ?? coinOrbSprite
+                       ?? GlassHudTheme.LoadSprite("Icon_CoinXu.png")
+                       ?? UIManager.LoadItemIconSprite("Icon_CoinXu.png")))
+                : (coinOrbSprite != null
+                    ? coinOrbSprite
+                    : (GlassHudTheme.LoadSprite("02_ModeSelect/Icon_Currency_CoinXu.png")
+                       ?? GlassHudTheme.LoadSprite("Icon_CoinXu.png")
+                       ?? UIManager.LoadItemIconSprite("Icon_CoinXu.png")));
+
+            if (isBattle && battleCoinIconSprite == null && resolvedCoin != null)
+            {
+                battleCoinIconSprite = resolvedCoin;
+            }
+
+            if (resolvedCoin != null && (coinOrbSprite == null || isBattle))
+            {
+                coinOrbSprite = resolvedCoin;
+            }
+
+            if (coinIcon != null)
+            {
+                if (resolvedCoin != null && (coinIcon.sprite == null || isBattle))
+                {
+                    coinIcon.sprite = resolvedCoin;
+                }
+                coinIcon.preserveAspect = true;
+            }
         }
 
         private void OnDisable()
@@ -150,10 +295,11 @@ namespace StickmanBeatEmUp.UI
         {
             if (!isSubscribed) return;
 
-            if (CurrencyManager.HasInstance)
+            CurrencyManager manager = CurrencyManager.HasInstance ? CurrencyManager.Instance : null;
+            if (manager != null)
             {
-                CurrencyManager.Instance.OnCoinsChanged -= HandleCoinsChanged;
-                CurrencyManager.Instance.OnCoinsEarnedWorld -= HandleCoinsEarnedWorld;
+                manager.OnCoinsChanged -= HandleCoinsChanged;
+                manager.OnCoinsEarnedWorld -= HandleCoinsEarnedWorld;
             }
             isSubscribed = false;
         }

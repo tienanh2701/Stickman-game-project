@@ -3,6 +3,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using StickmanBeatEmUp.Core;
 using StickmanBeatEmUp.Items;
+using StickmanBeatEmUp.UI;
 
 namespace StickmanBeatEmUp.Economy
 {
@@ -24,6 +25,7 @@ namespace StickmanBeatEmUp.Economy
         public Text slotEButtonText;
         public GameObject equippedQHighlight;
         public GameObject equippedEHighlight;
+        public Image rowBackground;
     }
 
     /// <summary>
@@ -43,6 +45,16 @@ namespace StickmanBeatEmUp.Economy
         [SerializeField] private Image slotESummaryIcon;
         [SerializeField] private ShopItemRow[] shopRows;
         [SerializeField] private float feedbackDisplayDuration = 2.5f;
+
+        [Header("Glassmorphism Styling (Optional)")]
+        [SerializeField] private Sprite rowGlassStripSprite;
+        [SerializeField] private Sprite greenBuyButtonSprite;
+        [SerializeField] private VerticalLayoutGroup rowsLayoutGroup;
+
+        [Header("SlicedUI Styling (05_Shop)")]
+        [SerializeField] private Sprite shopMainPanelSprite;
+        [SerializeField] private Sprite summaryBarSprite;
+        [SerializeField] private Sprite iconSlotBlueGlowSprite;
 
         private float feedbackTimer;
         private bool rowsBound;
@@ -66,6 +78,12 @@ namespace StickmanBeatEmUp.Economy
             }
         }
 
+        private void Start()
+        {
+            ApplyShopGlassStyling();
+            RefreshShopUI();
+        }
+
         private void OnEnable()
         {
             if (Instance == null)
@@ -86,19 +104,23 @@ namespace StickmanBeatEmUp.Economy
             }
 
             BindRowButtons();
+            ApplyShopGlassStyling();
             RefreshShopUI();
         }
 
         private void OnDisable()
         {
-            if (CurrencyManager.HasInstance)
+            rowsBound = false;
+            CurrencyManager cm = CurrencyManager.HasInstance ? CurrencyManager.Instance : null;
+            if (cm != null)
             {
-                CurrencyManager.Instance.OnCoinsChanged -= HandleCoinsChanged;
+                cm.OnCoinsChanged -= HandleCoinsChanged;
             }
 
-            if (InventoryManager.HasInstance)
+            InventoryManager inv = InventoryManager.HasInstance ? InventoryManager.Instance : null;
+            if (inv != null)
             {
-                InventoryManager.Instance.OnInventoryChanged -= HandleInventoryChanged;
+                inv.OnInventoryChanged -= HandleInventoryChanged;
             }
         }
 
@@ -144,12 +166,35 @@ namespace StickmanBeatEmUp.Economy
             rowsBound = false;
 
             BindRowButtons();
+            ApplyShopGlassStyling();
             RefreshShopUI();
         }
 
-        /// <summary>
-        /// Lấy toàn bộ danh sách ConsumableItemSO từ InventoryManager.
-        /// </summary>
+        public void ConfigureGlassSprites(Sprite rowStrip, Sprite buyBtnSprite, VerticalLayoutGroup layoutGroup = null)
+        {
+            if (rowStrip != null) rowGlassStripSprite = rowStrip;
+            if (buyBtnSprite != null) greenBuyButtonSprite = buyBtnSprite;
+            if (layoutGroup != null) rowsLayoutGroup = layoutGroup;
+            ApplyShopGlassStyling();
+        }
+
+        public void ConfigureThemeSprites(
+            Sprite mainFrame,
+            Sprite summaryBar,
+            Sprite rowStrip,
+            Sprite iconSlot,
+            Sprite buyBtn,
+            VerticalLayoutGroup layoutGroup = null)
+        {
+            if (mainFrame != null) shopMainPanelSprite = mainFrame;
+            if (summaryBar != null) summaryBarSprite = summaryBar;
+            if (rowStrip != null) rowGlassStripSprite = rowStrip;
+            if (iconSlot != null) iconSlotBlueGlowSprite = iconSlot;
+            if (buyBtn != null) greenBuyButtonSprite = buyBtn;
+            if (layoutGroup != null) rowsLayoutGroup = layoutGroup;
+            ApplyShopGlassStyling();
+        }
+
         public ConsumableItemSO[] GetCatalogItems()
         {
             return InventoryManager.Instance != null
@@ -228,14 +273,23 @@ namespace StickmanBeatEmUp.Economy
         /// </summary>
         public void EquipToSlot(int slotIndex, ConsumableItemType type)
         {
+            if (slotIndex != InventoryManager.SLOT_Q && slotIndex != InventoryManager.SLOT_E) return;
+
             InventoryManager inventory = InventoryManager.Instance;
             if (inventory == null) return;
 
             inventory.SetEquippedItem(slotIndex, type);
             ConsumableItemSO data = inventory.GetItemData(type);
-            string itemLabel = data != null && !string.IsNullOrEmpty(data.itemName) ? data.itemName : type.ToString();
             string slotLabel = slotIndex == InventoryManager.SLOT_Q ? "Q" : "E";
-            ShowFeedback($"Đã trang bị {itemLabel} vào ô {slotLabel}!", true);
+            if (type == ConsumableItemType.None)
+            {
+                ShowFeedback($"Đã bỏ trang bị ô {slotLabel}!", true);
+            }
+            else
+            {
+                string itemLabel = data != null && !string.IsNullOrEmpty(data.itemName) ? data.itemName : type.ToString();
+                ShowFeedback($"Đã trang bị {itemLabel} vào ô {slotLabel}!", true);
+            }
             RefreshShopUI();
         }
 
@@ -284,10 +338,17 @@ namespace StickmanBeatEmUp.Economy
                 bool isEquippedQ = equippedQ == row.itemType;
                 bool isEquippedE = equippedE == row.itemType;
 
-                if (row.iconImage != null && data != null && data.icon != null)
+                if (row.iconImage != null)
                 {
-                    row.iconImage.sprite = data.icon;
+                    Sprite resolvedIcon = (data != null && data.icon != null)
+                        ? data.icon
+                        : GetFallbackItemIcon(row.itemType);
+                    if (resolvedIcon != null)
+                    {
+                        row.iconImage.sprite = resolvedIcon;
+                    }
                     row.iconImage.preserveAspect = true;
+                    row.iconImage.color = Color.white;
                 }
 
                 if (row.nameText != null && data != null)
@@ -310,7 +371,13 @@ namespace StickmanBeatEmUp.Economy
 
                 if (row.buyButton != null)
                 {
-                    row.buyButton.interactable = coins >= price;
+                    row.buyButton.interactable = true;
+                    if (row.buyButton.TryGetComponent(out Image buyBtnImg))
+                    {
+                        buyBtnImg.color = (coins >= price)
+                            ? Color.white
+                            : new Color(0.72f, 0.76f, 0.82f, 0.88f);
+                    }
                 }
 
                 if (row.slotQButtonText != null)
@@ -412,17 +479,373 @@ namespace StickmanBeatEmUp.Economy
 
             if (summaryIcon != null)
             {
-                if (data != null && data.icon != null)
+                Sprite resolvedIcon = (data != null && data.icon != null)
+                    ? data.icon
+                    : GetFallbackItemIcon(itemType);
+                if (resolvedIcon != null)
                 {
-                    summaryIcon.sprite = data.icon;
+                    summaryIcon.sprite = resolvedIcon;
                     summaryIcon.enabled = true;
                     summaryIcon.preserveAspect = true;
+                    summaryIcon.color = Color.white;
                 }
                 else
                 {
                     summaryIcon.enabled = false;
                 }
             }
+        }
+
+        private static Sprite ResolveShopSprite(Sprite current, string relPath, string expectedName)
+        {
+            if (current != null && string.Equals(current.name, expectedName, StringComparison.OrdinalIgnoreCase))
+            {
+                return current;
+            }
+            Sprite loaded = GlassHudTheme.LoadSprite(relPath);
+            return loaded != null ? loaded : current;
+        }
+
+        private void EnsureShopThemeSprites()
+        {
+            shopMainPanelSprite = ResolveShopSprite(shopMainPanelSprite, "05_Shop/Frame_Shop_MainPanel_Clean", "Frame_Shop_MainPanel_Clean");
+            summaryBarSprite = ResolveShopSprite(summaryBarSprite, "05_Shop/Bar_Shop_InventorySummary_Clean", "Bar_Shop_InventorySummary_Clean");
+            rowGlassStripSprite = ResolveShopSprite(rowGlassStripSprite, "05_Shop/Row_Shop_ItemStrip_Clean", "Row_Shop_ItemStrip_Clean");
+            iconSlotBlueGlowSprite = ResolveShopSprite(iconSlotBlueGlowSprite, "05_Shop/Slot_Shop_ItemIcon_BlueGlow", "Slot_Shop_ItemIcon_BlueGlow");
+            greenBuyButtonSprite = ResolveShopSprite(greenBuyButtonSprite, "05_Shop/Btn_Shop_Buy_Clean", "Btn_Shop_Buy_Clean");
+        }
+
+        public void ApplyShopGlassStyling()
+        {
+            EnsureShopThemeSprites();
+
+            if (TryGetComponent(out Image panelImg))
+            {
+                panelImg.color = Color.clear;
+                panelImg.raycastTarget = false;
+            }
+
+            Transform shopTitleTf = transform.Find("ShopTitle");
+            if (shopTitleTf != null)
+            {
+                if (shopTitleTf.TryGetComponent(out RectTransform titleRt))
+                {
+                    titleRt.anchoredPosition = new Vector2(0f, 456f);
+                    titleRt.sizeDelta = new Vector2(1200f, 64f);
+                }
+                if (shopTitleTf.TryGetComponent(out Text shopTitleTxt))
+                {
+                    StyleLegacyTextCrisp(shopTitleTxt, shopTitleTxt.color);
+                }
+            }
+
+            Transform summaryBarTf = transform.Find("ShopSummaryBar");
+            if (summaryBarTf != null)
+            {
+                if (summaryBarTf.TryGetComponent(out RectTransform summaryRt))
+                {
+                    summaryRt.anchorMin = new Vector2(0.5f, 0.5f);
+                    summaryRt.anchorMax = new Vector2(0.5f, 0.5f);
+                    summaryRt.pivot = new Vector2(0.5f, 0.5f);
+                    summaryRt.anchoredPosition = new Vector2(0f, 368f);
+                    summaryRt.sizeDelta = new Vector2(1460f, 76f);
+                }
+                if (summaryBarTf.TryGetComponent(out Image summaryBg))
+                {
+                    if (summaryBarSprite != null)
+                    {
+                        GlassHudTheme.ApplySlicedSprite(summaryBg, summaryBarSprite, 1460f, 76f, Color.white);
+                    }
+                    else
+                    {
+                        summaryBg.color = new Color(0.06f, 0.09f, 0.16f, 0.56f);
+                    }
+                    if (summaryBarTf.TryGetComponent(out Outline summaryOutline))
+                    {
+                        summaryOutline.enabled = false;
+                    }
+                }
+            }
+
+            EnsureRowsLayoutContainer();
+            EnsureShopMainFrame();
+
+            if (feedbackText != null)
+            {
+                RectTransform fbRt = feedbackText.rectTransform;
+                fbRt.anchoredPosition = new Vector2(0f, -424f);
+                fbRt.sizeDelta = new Vector2(1200f, 48f);
+            }
+
+            StyleLegacyTextCrisp(coinsBalanceText, coinsBalanceText != null ? coinsBalanceText.color : Color.white);
+            StyleLegacyTextCrisp(slotQSummaryText, slotQSummaryText != null ? slotQSummaryText.color : Color.white);
+            StyleLegacyTextCrisp(slotESummaryText, slotESummaryText != null ? slotESummaryText.color : Color.white);
+            StyleLegacyTextCrisp(feedbackText, feedbackText != null ? feedbackText.color : Color.white);
+
+            if (shopRows == null) return;
+            for (int i = 0; i < shopRows.Length; i++)
+            {
+                ShopItemRow row = shopRows[i];
+                if (row == null) continue;
+
+                Image rowBg = row.rowBackground;
+                if (rowBg == null && row.buyButton != null && row.buyButton.transform.parent != null)
+                {
+                    rowBg = row.buyButton.transform.parent.GetComponent<Image>();
+                }
+                if (rowBg != null)
+                {
+                    RectTransform rowRt = rowBg.rectTransform;
+                    rowRt.sizeDelta = new Vector2(1440f, 168f);
+                    if (rowBg.TryGetComponent(out LayoutElement le))
+                    {
+                        le.preferredWidth = 1440f;
+                        le.preferredHeight = 168f;
+                    }
+
+                    if (rowGlassStripSprite != null)
+                    {
+                        GlassHudTheme.ApplySlicedSprite(rowBg, rowGlassStripSprite, 1440f, 168f, Color.white);
+                    }
+                }
+
+                if (row.nameText != null)
+                {
+                    RectTransform nrt = row.nameText.rectTransform;
+                    nrt.anchoredPosition = new Vector2(-280f, 0f);
+                    nrt.sizeDelta = new Vector2(430f, 52f);
+                }
+                if (row.priceText != null)
+                {
+                    RectTransform prt = row.priceText.rectTransform;
+                    prt.anchoredPosition = new Vector2(65f, 0f);
+                    prt.sizeDelta = new Vector2(170f, 44f);
+                }
+                if (row.ownedCountText != null)
+                {
+                    RectTransform ort = row.ownedCountText.rectTransform;
+                    ort.anchoredPosition = new Vector2(265f, 0f);
+                    ort.sizeDelta = new Vector2(210f, 44f);
+                }
+
+                if (row.buyButton != null)
+                {
+                    RectTransform buyRt = row.buyButton.GetComponent<RectTransform>();
+                    if (buyRt != null)
+                    {
+                        buyRt.anchorMin = new Vector2(1f, 0.5f);
+                        buyRt.anchorMax = new Vector2(1f, 0.5f);
+                        buyRt.pivot = new Vector2(0.5f, 0.5f);
+                        buyRt.anchoredPosition = new Vector2(-144f, 0f);
+                        buyRt.sizeDelta = new Vector2(224f, 84f);
+                    }
+
+                    if (row.buyButton.TryGetComponent(out Image buyImg) && greenBuyButtonSprite != null)
+                    {
+                        GlassHudTheme.ApplySlicedSprite(buyImg, greenBuyButtonSprite, 224f, 84f, Color.white);
+                    }
+
+                    Text buyLabel = row.buyButton.GetComponentInChildren<Text>(true);
+                    if (buyLabel != null)
+                    {
+                        if (string.IsNullOrEmpty(buyLabel.text))
+                        {
+                            buyLabel.text = "MUA";
+                        }
+                        StyleLegacyTextCrisp(buyLabel, Color.white);
+                    }
+
+                    ModeCardHoverEffect buyHover = UIManager.EnsureButtonHoverEffect(row.buyButton, 3f, 1.035f, 15f);
+                    if (buyHover != null)
+                    {
+                        buyHover.SetBaseAnchoredPosition(new Vector2(-144f, 0f));
+                    }
+                }
+
+                if (row.iconImage != null)
+                {
+                    Sprite icon = GetFallbackItemIcon(row.itemType);
+                    if (row.iconImage.sprite == null && icon != null)
+                    {
+                        row.iconImage.sprite = icon;
+                    }
+                    row.iconImage.preserveAspect = true;
+                    row.iconImage.color = Color.white;
+
+                    RectTransform itemIconRt = row.iconImage.rectTransform;
+                    itemIconRt.anchorMin = Vector2.zero;
+                    itemIconRt.anchorMax = Vector2.one;
+                    itemIconRt.pivot = new Vector2(0.5f, 0.5f);
+                    itemIconRt.anchoredPosition = Vector2.zero;
+                    itemIconRt.offsetMin = new Vector2(18f, 18f);
+                    itemIconRt.offsetMax = new Vector2(-18f, -18f);
+
+                    if (row.iconImage.transform.parent != null &&
+                        row.iconImage.transform.parent.name == "IconFrame")
+                    {
+                        Transform iconFrameTf = row.iconImage.transform.parent;
+                        if (iconFrameTf.TryGetComponent(out RectTransform frameRt))
+                        {
+                            frameRt.anchorMin = new Vector2(0f, 0.5f);
+                            frameRt.anchorMax = new Vector2(0f, 0.5f);
+                            frameRt.pivot = new Vector2(0f, 0.5f);
+                            frameRt.anchoredPosition = new Vector2(34f, 0f);
+                            frameRt.sizeDelta = new Vector2(116f, 116f);
+                        }
+
+                        if (iconFrameTf.TryGetComponent(out Image iconFrameBg))
+                        {
+                            if (iconSlotBlueGlowSprite != null)
+                            {
+                                GlassHudTheme.ApplySlicedSprite(iconFrameBg, iconSlotBlueGlowSprite, 116f, 116f, Color.white);
+                            }
+                            else
+                            {
+                                iconFrameBg.color = new Color(0.05f, 0.08f, 0.14f, 0.42f);
+                            }
+                        }
+                    }
+                }
+
+                if (row.nameText != null) StyleLegacyTextCrisp(row.nameText, row.nameText.color);
+                if (row.priceText != null) StyleLegacyTextCrisp(row.priceText, row.priceText.color);
+                if (row.ownedCountText != null) StyleLegacyTextCrisp(row.ownedCountText, row.ownedCountText.color);
+                if (row.slotQButtonText != null) StyleLegacyTextCrisp(row.slotQButtonText, row.slotQButtonText.color);
+                if (row.slotEButtonText != null) StyleLegacyTextCrisp(row.slotEButtonText, row.slotEButtonText.color);
+            }
+        }
+
+        private void EnsureShopMainFrame()
+        {
+            Transform mainFrameTf = transform.Find("ShopMainFrame");
+            GameObject mainFrameObj;
+            if (mainFrameTf != null)
+            {
+                mainFrameObj = mainFrameTf.gameObject;
+            }
+            else
+            {
+                mainFrameObj = new GameObject("ShopMainFrame", typeof(RectTransform), typeof(Image));
+                mainFrameObj.transform.SetParent(transform, false);
+                Transform rowsContainerTf = rowsLayoutGroup != null ? rowsLayoutGroup.transform : transform.Find("ShopRowsContainer");
+                if (rowsContainerTf != null && rowsContainerTf.parent == transform)
+                {
+                    mainFrameObj.transform.SetSiblingIndex(rowsContainerTf.GetSiblingIndex());
+                }
+            }
+
+            RectTransform mfRt = mainFrameObj.GetComponent<RectTransform>();
+            if (mfRt != null)
+            {
+                mfRt.anchorMin = new Vector2(0.5f, 0.5f);
+                mfRt.anchorMax = new Vector2(0.5f, 0.5f);
+                mfRt.pivot = new Vector2(0.5f, 0.5f);
+                mfRt.anchoredPosition = new Vector2(0f, -32f);
+                mfRt.sizeDelta = new Vector2(1640f, 700f);
+            }
+
+            if (mainFrameObj.TryGetComponent(out Image mfImg))
+            {
+                mfImg.raycastTarget = false;
+                if (shopMainPanelSprite != null)
+                {
+                    GlassHudTheme.ApplySlicedSprite(mfImg, shopMainPanelSprite, 1640f, 700f, Color.white);
+                }
+                else
+                {
+                    mfImg.color = new Color(0.06f, 0.09f, 0.16f, 0.46f);
+                }
+            }
+        }
+
+        private static void StyleLegacyTextCrisp(Text txt, Color targetColor)
+        {
+            if (txt == null) return;
+            GlassHudTheme.StyleLegacyText(txt, -1, targetColor, bold: true, addShadow: true);
+            if ((targetColor.r + targetColor.g + targetColor.b) > 0.45f && txt.GetComponent<Outline>() == null)
+            {
+                Outline outline = txt.gameObject.AddComponent<Outline>();
+                outline.effectColor = new Color(0f, 0f, 0f, 0.88f);
+                outline.effectDistance = new Vector2(1.5f, -1.5f);
+            }
+        }
+
+        private void EnsureRowsLayoutContainer()
+        {
+            if (rowsLayoutGroup == null)
+            {
+                Transform existing = transform.Find("ShopRowsContainer");
+                if (existing != null)
+                {
+                    rowsLayoutGroup = existing.GetComponent<VerticalLayoutGroup>();
+                }
+            }
+
+            if (rowsLayoutGroup == null && Application.isPlaying && shopRows != null && shopRows.Length > 0)
+            {
+                Transform firstRow = shopRows[0]?.rowBackground != null
+                    ? shopRows[0].rowBackground.transform
+                    : shopRows[0]?.buyButton?.transform.parent;
+
+                if (firstRow != null && firstRow.parent == transform)
+                {
+                    GameObject containerObj = new GameObject("ShopRowsContainer", typeof(RectTransform));
+                    containerObj.transform.SetParent(transform, false);
+                    RectTransform rt = containerObj.GetComponent<RectTransform>();
+                    rt.anchorMin = new Vector2(0.5f, 0.5f);
+                    rt.anchorMax = new Vector2(0.5f, 0.5f);
+                    rt.pivot = new Vector2(0.5f, 0.5f);
+                    rt.anchoredPosition = new Vector2(0f, -32f);
+                    rt.sizeDelta = new Vector2(1440f, 548f);
+
+                    rowsLayoutGroup = containerObj.AddComponent<VerticalLayoutGroup>();
+                    rowsLayoutGroup.childAlignment = TextAnchor.UpperCenter;
+                    rowsLayoutGroup.childControlWidth = true;
+                    rowsLayoutGroup.childControlHeight = false;
+                    rowsLayoutGroup.childForceExpandWidth = true;
+                    rowsLayoutGroup.childForceExpandHeight = false;
+
+                    for (int i = 0; i < shopRows.Length; i++)
+                    {
+                        Transform rowTf = shopRows[i]?.rowBackground != null
+                            ? shopRows[i].rowBackground.transform
+                            : shopRows[i]?.buyButton?.transform.parent;
+                        if (rowTf == null || rowTf.parent != transform) continue;
+
+                        rowTf.SetParent(containerObj.transform, false);
+                        LayoutElement le = rowTf.GetComponent<LayoutElement>();
+                        if (le == null) le = rowTf.gameObject.AddComponent<LayoutElement>();
+                        le.preferredWidth = 1440f;
+                        le.preferredHeight = 168f;
+                    }
+                }
+            }
+
+            if (rowsLayoutGroup != null)
+            {
+                if (rowsLayoutGroup.TryGetComponent(out RectTransform rowsRt))
+                {
+                    rowsRt.anchoredPosition = new Vector2(0f, -32f);
+                    rowsRt.sizeDelta = new Vector2(1440f, 548f);
+                }
+                rowsLayoutGroup.spacing = 16f;
+                if (rowsLayoutGroup.TryGetComponent(out Image containerImg))
+                {
+                    containerImg.color = Color.clear;
+                    containerImg.raycastTarget = false;
+                }
+            }
+        }
+
+        private static Sprite GetFallbackItemIcon(ConsumableItemType itemType)
+        {
+            return itemType switch
+            {
+                ConsumableItemType.SenzuBean => UIManager.LoadItemIconSprite("Icon_SenzuBean.png"),
+                ConsumableItemType.SpinalFluid => UIManager.LoadItemIconSprite("Icon_SpinalFluid.png"),
+                ConsumableItemType.UltraDivineWater => UIManager.LoadItemIconSprite("Icon_UltraDivineWater.png"),
+                _ => null
+            };
         }
 
         private void ShowFeedback(string message, bool isSuccess)

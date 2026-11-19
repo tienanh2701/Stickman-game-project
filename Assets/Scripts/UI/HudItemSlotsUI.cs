@@ -38,11 +38,16 @@ namespace StickmanBeatEmUp.UI
         [SerializeField] private Image blockFillImage;
         [SerializeField] private GameObject blockGroup;
 
+        [Header("Sliced/Glass Sprites (Standalone Safety)")]
+        [SerializeField] private Sprite hudOrbFrameSprite;
+        [SerializeField] private Sprite miniPillBadgeSprite;
+
         private BaseCharacter activePlayer;
         private float nextPlayerLookupTime;
         private bool isInventorySubscribed;
         private bool isLevelSubscribed;
         private bool lastKnownFreeUseMode;
+        private bool hasAppliedGlassTheme;
         private Coroutine pulseQCoroutine;
         private Coroutine pulseECoroutine;
 
@@ -64,6 +69,7 @@ namespace StickmanBeatEmUp.UI
                 emptySlotSprite = emptySprite;
             }
 
+            hasAppliedGlassTheme = false;
             RefreshSlots();
         }
 
@@ -95,6 +101,7 @@ namespace StickmanBeatEmUp.UI
                 emptySlotSprite = emptySprite;
             }
 
+            hasAppliedGlassTheme = false;
             RefreshSlots();
         }
 
@@ -106,6 +113,10 @@ namespace StickmanBeatEmUp.UI
 
         public void RefreshSlots()
         {
+            if (Application.isPlaying)
+            {
+                EnsureGlassThemeApplied();
+            }
             RefreshSlot(slotQ, InventoryManager.SLOT_Q, "Q");
             RefreshSlot(slotE, InventoryManager.SLOT_E, "E");
         }
@@ -121,8 +132,146 @@ namespace StickmanBeatEmUp.UI
         {
             SubscribeEvents();
             ResolveActivePlayer();
+            EnsureGlassThemeApplied();
             RefreshSlots();
             UpdateBlockIndicator();
+        }
+
+        private void EnsureGlassThemeApplied()
+        {
+            if (hasAppliedGlassTheme) return;
+
+            if (transform is RectTransform panelRt)
+            {
+                panelRt.anchorMin = Vector2.zero;
+                panelRt.anchorMax = Vector2.zero;
+                panelRt.pivot = Vector2.zero;
+                panelRt.anchoredPosition = new Vector2(22f, 16f);
+                panelRt.sizeDelta = new Vector2(230f, 96f);
+            }
+
+            Sprite orbSprite = hudOrbFrameSprite != null
+                ? hudOrbFrameSprite
+                : GlassHudTheme.LoadSprite("HudOrb_Frame_GoldGlass.png");
+            if (hudOrbFrameSprite == null && orbSprite != null)
+            {
+                hudOrbFrameSprite = orbSprite;
+            }
+
+            Sprite miniPillSprite = miniPillBadgeSprite != null
+                ? miniPillBadgeSprite
+                : GlassHudTheme.LoadSprite("MiniPill_GoldBadge.png");
+            if (miniPillBadgeSprite == null && miniPillSprite != null)
+            {
+                miniPillBadgeSprite = miniPillSprite;
+            }
+
+            if (orbSprite != null)
+            {
+                activeBorderColor = Color.white;
+                dimmedBorderColor = new Color(0.55f, 0.55f, 0.60f, 0.58f);
+            }
+
+            ApplySlotGlassStyle(slotQ, orbSprite, miniPillSprite);
+            ApplySlotGlassStyle(slotE, orbSprite, miniPillSprite);
+
+            if (orbSprite != null)
+            {
+                hasAppliedGlassTheme = true;
+            }
+        }
+
+        private static void ApplySlotGlassStyle(ItemSlotDisplay ui, Sprite orbSprite, Sprite miniPillSprite)
+        {
+            if (ui == null) return;
+
+            if (ui.slotBorder != null)
+            {
+                if (orbSprite != null)
+                {
+                    GlassHudTheme.ApplySprite(ui.slotBorder, orbSprite, sliced: false, preserveAspect: true);
+                }
+                else
+                {
+                    ui.slotBorder.type = Image.Type.Simple;
+                    ui.slotBorder.preserveAspect = true;
+                }
+                ui.slotBorder.raycastTarget = false;
+
+                Transform innerBgTr = ui.slotBorder.transform.Find("InnerBg");
+                if (innerBgTr != null && innerBgTr.TryGetComponent(out Image innerImg))
+                {
+                    innerImg.enabled = orbSprite == null;
+                    innerImg.color = new Color(0.05f, 0.08f, 0.14f, 0.30f);
+                    innerImg.rectTransform.sizeDelta = new Vector2(-16f, -16f);
+                    innerImg.raycastTarget = false;
+                }
+            }
+
+            if (ui.iconImage != null)
+            {
+                ui.iconImage.preserveAspect = true;
+                ui.iconImage.raycastTarget = false;
+                ui.iconImage.rectTransform.sizeDelta = new Vector2(-10f, -10f);
+            }
+
+            if (ui.keyBadgeText != null)
+            {
+                Transform keyParent = ui.keyBadgeText.transform.parent;
+                if (keyParent != null && (ui.slotBorder == null || keyParent != ui.slotBorder.transform))
+                {
+                    if (keyParent is RectTransform keyRt)
+                    {
+                        keyRt.sizeDelta = new Vector2(30f, 26f);
+                        keyRt.anchoredPosition = new Vector2(12f, -10f);
+                    }
+                    if (keyParent.TryGetComponent(out Image keyBg))
+                    {
+                        if (miniPillSprite != null)
+                        {
+                            GlassHudTheme.ApplySlicedSprite(keyBg, miniPillSprite, 30f, 26f);
+                        }
+                        else
+                        {
+                            GlassHudTheme.ApplySprite(keyBg, "MiniPill_GoldBadge.png", default, true, false);
+                        }
+                        keyBg.raycastTarget = false;
+                    }
+                }
+
+                ui.keyBadgeText.alignment = TextAlignmentOptions.Center;
+                ui.keyBadgeText.raycastTarget = false;
+                GlassHudTheme.StyleTmpText(ui.keyBadgeText, 14f, Color.white, true, true);
+            }
+
+            if (ui.countBadgeText != null)
+            {
+                Transform countParent = ui.countBadgeText.transform.parent;
+                if (countParent != null && (ui.slotBorder == null || countParent != ui.slotBorder.transform))
+                {
+                    if (countParent is RectTransform countRt)
+                    {
+                        countRt.sizeDelta = new Vector2(48f, 24f);
+                        countRt.anchoredPosition = new Vector2(-10f, 8f);
+                    }
+                    if (countParent.TryGetComponent(out Image countBg))
+                    {
+                        if (miniPillSprite != null)
+                        {
+                            GlassHudTheme.ApplySlicedSprite(countBg, miniPillSprite, 48f, 24f);
+                        }
+                        else
+                        {
+                            GlassHudTheme.ApplySprite(countBg, "MiniPill_GoldBadge.png", default, true, false);
+                        }
+                        countBg.raycastTarget = false;
+                    }
+                }
+
+                ui.countBadgeText.alignment = TextAlignmentOptions.Center;
+                ui.countBadgeText.raycastTarget = false;
+                GlassHudTheme.StyleTmpText(ui.countBadgeText, 13f, null, true, true);
+            }
         }
 
         private void OnDisable()
@@ -174,10 +323,14 @@ namespace StickmanBeatEmUp.UI
 
         private void UnsubscribeEvents()
         {
-            if (isInventorySubscribed && InventoryManager.HasInstance)
+            if (isInventorySubscribed)
             {
-                InventoryManager.Instance.OnInventoryChanged -= HandleInventoryChanged;
-                InventoryManager.Instance.OnSlotConsumed -= HandleSlotConsumed;
+                InventoryManager inv = InventoryManager.HasInstance ? InventoryManager.Instance : null;
+                if (inv != null)
+                {
+                    inv.OnInventoryChanged -= HandleInventoryChanged;
+                    inv.OnSlotConsumed -= HandleSlotConsumed;
+                }
             }
             isInventorySubscribed = false;
 
@@ -295,6 +448,7 @@ namespace StickmanBeatEmUp.UI
 
         private void UpdateBlockIndicator()
         {
+            if (PlayerVitalsHudUI.Instance != null && PlayerVitalsHudUI.Instance.isActiveAndEnabled) return;
             if (blockCooldownText == null && blockFillImage == null) return;
             if (blockGroup != null && !blockGroup.activeInHierarchy) return;
 
