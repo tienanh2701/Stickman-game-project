@@ -502,6 +502,8 @@ MonoBehaviour:
   blockDuration: 0.75
   blockCooldown: 0
   blockDamageMultiplier: 0.2
+  hurtDuration: 0.15
+  stunImmunityDuration: 0.4
   thunderSpearPrefab: {fileID: 6721907522460842987, guid: cdbf4258d38a9a24d8c683f8e06aec30, type: 3}
   titanShockwavePrefab: {fileID: 291732394067388573, guid: 21e0f3c8e7ecf444186393dd2c907e2f, type: 3}
   rockProjectilePrefab: {fileID: 1490466824969906521, guid: f2c87296db9103743a3721fea066a58d, type: 3}

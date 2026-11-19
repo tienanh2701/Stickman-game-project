@@ -10,7 +10,9 @@ GameObject:
   m_Component:
   - component: {fileID: 358548680877893230}
   - component: {fileID: 425844612487025574}
-  - component: {fileID: 8281889148539268200}
+  - component: {fileID: 7215299415953564008}
+  - component: {fileID: 8297380660479747102}
+  - component: {fileID: 4177413662712034401}
   m_Layer: 0
   m_Name: GenkiDama
   m_TagString: Untagged
@@ -28,7 +30,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 2.8, y: 2.8, z: 2.8}
+  m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
@@ -80,7 +82,7 @@ SpriteRenderer:
   m_GlobalIlluminationMeshLod: 0
   m_SortingLayerID: 0
   m_SortingLayer: 0
-  m_SortingOrder: 7
+  m_SortingOrder: 8
   m_MaskInteraction: 0
   m_Sprite: {fileID: 21300000, guid: ce1e9ae1fcc8fb94db3ad3ca7ba6df73, type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
@@ -93,7 +95,70 @@ SpriteRenderer:
   m_WasSpriteAssigned: 1
   m_SpriteSortPoint: 0
   m_BlendShapeWeights: []
---- !u!114 &8281889148539268200
+--- !u!58 &7215299415953564008
+CircleCollider2D:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5286487021890079772}
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Density: 1
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_ForceSendLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_ForceReceiveLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_ContactCaptureLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_CallbackLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_IsTrigger: 1
+  m_UsedByEffector: 0
+  m_CompositeOperation: 0
+  m_CompositeOrder: 0
+  m_Offset: {x: 0, y: 0}
+  m_Radius: 0.8925
+--- !u!50 &8297380660479747102
+Rigidbody2D:
+  serializedVersion: 5
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5286487021890079772}
+  m_BodyType: 1
+  m_Simulated: 1
+  m_UseFullKinematicContacts: 0
+  m_UseAutoMass: 0
+  m_Mass: 1
+  m_LinearDamping: 0
+  m_AngularDamping: 0.05
+  m_GravityScale: 0
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_Interpolate: 0
+  m_SleepingMode: 1
+  m_CollisionDetection: 0
+  m_Constraints: 0
+--- !u!114 &4177413662712034401
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -102,16 +167,12 @@ MonoBehaviour:
   m_GameObject: {fileID: 5286487021890079772}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 9ecf838b02e8c3b47b22a06632e57b1c, type: 3}
+  m_Script: {fileID: 11500000, guid: 30207c8b3e934eeaae965ec4ada40921, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::StickmanBeatEmUp.Combat.Explosion
-  radius: 8
-  damage: 40
-  knockback: {x: 8, y: 5}
-  attackType: 3
-  breaksSuperArmor: 1
-  targetLayer:
-    serializedVersion: 2
-    m_Bits: 0
-  duration: 0.35
-  visualEffectPrefab: {fileID: 0}
+  m_EditorClassIdentifier: Assembly-CSharp::StickmanBeatEmUp.Combat.GenkiDamaProjectile
+  flightSpeed: 16.5
+  maxFlightDuration: 2.2
+  initialChargeScaleRatio: 0.18
+  haloScaleMultiplier: 1.42
+  sparkTint: {r: 0.55, g: 0.92, b: 1, a: 1}
+  flashColor: {r: 0.86, g: 0.96, b: 1, a: 0}

@@ -192,7 +192,7 @@ namespace StickmanBeatEmUp.Editor
             GameObject kiBlastPrefab = CreateProjectilePrefab("KiBlast", SpriteHelper.LoadSprite($"{combatSprites}/FX_KiOrb.png", circleSprite), Color.white, 14f, 2.5f, 0.9f, false);
             GameObject kiExplosionPrefab = CreateExplosionPrefab("KiExplosion", SpriteHelper.LoadSprite($"{combatSprites}/FX_Explosion_0.png", circleSprite), Color.white, 3.5f, 1.4f);
             GameObject kamehamehaPrefab = CreateBeamPrefab("KamehamehaBeam", new Color(0.2f, 0.8f, 1f), 20f, 2.5f);
-            GameObject genkiDamaPrefab = CreateExplosionPrefab("GenkiDama", SpriteHelper.LoadSprite($"{combatSprites}/FX_GenkiDamaOrb.png", circleSprite), Color.white, 8f, 2.8f);
+            GameObject genkiDamaPrefab = CreateGenkiDamaPrefab("GenkiDama", SpriteHelper.LoadSprite($"{combatSprites}/FX_GenkiDamaOrb.png", circleSprite));
 
             GameObject thunderSpearPrefab = CreateProjectilePrefab("ThunderSpear", SpriteHelper.LoadSprite($"{combatSprites}/FX_ThunderSpear.png", squareSprite), Color.white, 16f, 2f, 1.0f, false);
             GameObject titanShockwavePrefab = CreateShockwavePrefab("TitanShockwave", SpriteHelper.LoadSprite($"{combatSprites}/FX_Shockwave.png", squareSprite), Color.white, 9f);
@@ -865,14 +865,15 @@ namespace StickmanBeatEmUp.Editor
             BoxCollider2D cableCol = cableObj.AddComponent<BoxCollider2D>();
             cableCol.isTrigger = true;
             cableCol.size = new Vector2(1.8f, 0.7f);
+            cableCol.enabled = false;
             TetherCableHitbox cableComp = cableObj.AddComponent<TetherCableHitbox>();
             cableComp.SetCableHealth(20f);
 
-            // Underground Crystal Core
+            // Underground Crystal Core (Enlarged 2.35x + wired to TetherBossController for 100% barrier until Titan downed)
             GameObject coreObj = new GameObject("CrystalCore");
             coreObj.layer = 8;
             coreObj.transform.SetParent(go.transform, false);
-            coreObj.transform.localPosition = new Vector3(4.5f, 0f, 0f);
+            coreObj.transform.localScale = Vector3.one * CrystalCore.ENLARGED_SCALE;
             SpriteRenderer coreSr = coreObj.AddComponent<SpriteRenderer>();
             coreSr.sprite = crystalSprite;
             coreSr.sortingOrder = 5;
@@ -881,15 +882,15 @@ namespace StickmanBeatEmUp.Editor
             coreCol.size = new Vector2(1.2f, 1.4f);
             coreCol.offset = new Vector2(0f, 0.7f);
             CrystalCore coreComp = coreObj.AddComponent<CrystalCore>();
-            coreComp.SetMaxHealth(50f);
-            SerializedObject cSO = new SerializedObject(coreComp);
-            cSO.FindProperty("spriteRenderer").objectReferenceValue = coreSr;
-            cSO.ApplyModifiedProperties();
+            coreComp.SetMaxHealth(500f);
+            coreComp.EnsureEnlargedScaleAndBounds();
+            float coreLocalY = coreComp.GetGroundPlacementY(BossBase.GROUND_Y) - BossBase.GROUND_Y;
+            coreObj.transform.localPosition = new Vector3(4.5f, coreLocalY, 0f);
 
             // Cart Titan Artillery Partner Visual + FirePoint
             GameObject cartObj = new GameObject("CartTitanVisual");
             cartObj.transform.SetParent(go.transform, false);
-            cartObj.transform.localPosition = new Vector3(4.8f, 0f, 0f);
+            cartObj.transform.localPosition = new Vector3(4.5f + coreComp.GetWorldHalfWidth() + 1.7f, 0f, 0f);
             SpriteRenderer cartSr = cartObj.AddComponent<SpriteRenderer>();
             cartSr.sprite = cartSprite;
             cartSr.sortingOrder = 4;
@@ -898,6 +899,10 @@ namespace StickmanBeatEmUp.Editor
             cartFire.transform.localPosition = new Vector3(-0.9f, 0.85f, 0f);
 
             TetherBossController boss = go.AddComponent<TetherBossController>();
+            SerializedObject cSO = new SerializedObject(coreComp);
+            cSO.FindProperty("spriteRenderer").objectReferenceValue = coreSr;
+            cSO.FindProperty("mainTitanBody").objectReferenceValue = boss;
+            cSO.ApplyModifiedProperties();
             SerializedObject bSO = new SerializedObject(boss);
             bSO.FindProperty("bossData").objectReferenceValue = data;
             bSO.FindProperty("spriteRenderer").objectReferenceValue = sr;
@@ -912,6 +917,7 @@ namespace StickmanBeatEmUp.Editor
             bSO.FindProperty("cartTurretProjectilePrefab").objectReferenceValue = cartProjPrefab;
             bSO.FindProperty("cartTurretFirePoint").objectReferenceValue = cartFire.transform;
             bSO.FindProperty("cartCannonDamage").floatValue = 8f;
+            bSO.FindProperty("downedReviveDelay").floatValue = 10f;
             bSO.ApplyModifiedProperties();
 
             GameObject prefab = PrefabUtility.SaveAsPrefabAsset(go, path);
@@ -1145,11 +1151,11 @@ namespace StickmanBeatEmUp.Editor
             {
                 GameObject shieldObj = new GameObject("BlockShieldVisual");
                 shieldObj.transform.SetParent(go.transform, false);
-                shieldObj.transform.localPosition = new Vector3(0.32f, 0.9f, 0f);
-                shieldObj.transform.localScale = new Vector3(1.1f, 1.1f, 1f);
+                shieldObj.transform.localPosition = new Vector3(0f, 0.85f, 0f);
+                shieldObj.transform.localScale = new Vector3(1.7f, 1.7f, 1f);
                 blockShieldSr = shieldObj.AddComponent<SpriteRenderer>();
                 blockShieldSr.sprite = SpriteHelper.LoadSprite("Assets/Sprites/Combat/FX_BlockShield_Cyan.png", auraSprite);
-                blockShieldSr.color = new Color(0.75f, 0.95f, 1f, 0.85f);
+                blockShieldSr.color = new Color(0.85f, 0.98f, 1f, 0.72f);
                 blockShieldSr.sortingOrder = 8;
                 shieldObj.SetActive(false);
             }
@@ -1170,6 +1176,10 @@ namespace StickmanBeatEmUp.Editor
             ctrlSO.FindProperty("blockShieldVisual").objectReferenceValue = blockShieldSr;
             ctrlSO.FindProperty("blockDuration").floatValue = 0.75f;
             ctrlSO.FindProperty("blockCooldown").floatValue = 0f;
+            SerializedProperty hurtDurProp = ctrlSO.FindProperty("hurtDuration");
+            if (hurtDurProp != null) hurtDurProp.floatValue = 0.15f;
+            SerializedProperty stunImmProp = ctrlSO.FindProperty("stunImmunityDuration");
+            if (stunImmProp != null) stunImmProp.floatValue = 0.4f;
             ctrlSO.FindProperty("mapMaxY").floatValue = 4.8f;
 
             customBinding?.Invoke(controller, ctrlSO);
@@ -1446,6 +1456,31 @@ namespace StickmanBeatEmUp.Editor
             pSO.FindProperty("lifeTime").floatValue = lifetime;
             pSO.FindProperty("isPiercing").boolValue = piercing;
             pSO.ApplyModifiedProperties();
+
+            GameObject prefab = PrefabUtility.SaveAsPrefabAsset(go, path);
+            Object.DestroyImmediate(go);
+            return prefab;
+        }
+
+        private static GameObject CreateGenkiDamaPrefab(string name, Sprite sprite)
+        {
+            string path = $"{PREFABS_ROOT}/Combat/{name}.prefab";
+            GameObject go = new GameObject(name);
+
+            SpriteRenderer sr = go.AddComponent<SpriteRenderer>();
+            sr.sprite = sprite;
+            sr.color = Color.white;
+            sr.sortingOrder = 8;
+
+            CircleCollider2D col = go.AddComponent<CircleCollider2D>();
+            col.isTrigger = true;
+            col.radius = sprite != null ? Mathf.Max(0.45f, Mathf.Max(sprite.bounds.extents.x, sprite.bounds.extents.y) * 0.85f) : 0.45f;
+
+            Rigidbody2D rb = go.AddComponent<Rigidbody2D>();
+            rb.gravityScale = 0f;
+            rb.bodyType = RigidbodyType2D.Kinematic;
+
+            go.AddComponent<GenkiDamaProjectile>();
 
             GameObject prefab = PrefabUtility.SaveAsPrefabAsset(go, path);
             Object.DestroyImmediate(go);

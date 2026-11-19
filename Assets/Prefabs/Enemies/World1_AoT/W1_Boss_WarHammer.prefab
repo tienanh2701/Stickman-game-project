@@ -429,7 +429,7 @@ MonoBehaviour:
   groundSpikesPrefab: {fileID: 7146434778999286815, guid: f3f5134e0a1dc524e8b4207ab77fd4d8, type: 3}
   cartTurretProjectilePrefab: {fileID: 8678445771183793417, guid: c8d800a4697eafb41a361cce8ee08c14, type: 3}
   cartTurretFirePoint: {fileID: 4787440982114249855}
-  downedReviveDelay: 5
+  downedReviveDelay: 10
   cartArtilleryInterval: 4.2
   cartCannonDamage: 8
 --- !u!1 &3358367777159590863
@@ -472,7 +472,7 @@ BoxCollider2D:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 3358367777159590863}
-  m_Enabled: 1
+  m_Enabled: 0
   serializedVersion: 3
   m_Density: 1
   m_Material: {fileID: 0}
@@ -582,7 +582,7 @@ Transform:
   m_GameObject: {fileID: 8263011949668456371}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 4.8, y: 0, z: 0}
+  m_LocalPosition: {x: 7.521875, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -677,8 +677,8 @@ Transform:
   m_GameObject: {fileID: 8591829578199796911}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 4.5, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_LocalPosition: {x: 4.5, y: 1.4756249, z: 0}
+  m_LocalScale: {x: 2.35, y: 2.35, z: 2.35}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 6724067809665944730}
@@ -777,7 +777,7 @@ BoxCollider2D:
   m_UsedByEffector: 0
   m_CompositeOperation: 0
   m_CompositeOrder: 0
-  m_Offset: {x: 0, y: 0.7}
+  m_Offset: {x: 0, y: 0}
   m_SpriteTilingProperty:
     border: {x: 0, y: 0, z: 0, w: 0}
     pivot: {x: 0.5, y: 0.5}
@@ -801,5 +801,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: fdd27ccc94abc304b9c48e4c3e3f153e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::StickmanBeatEmUp.Enemies.CrystalCore
-  maxHealth: 50
+  maxHealth: 500
   spriteRenderer: {fileID: 6190884589830349021}
+  mainTitanBody: {fileID: 6351563618117348191}

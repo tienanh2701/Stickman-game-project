@@ -1,4 +1,5 @@
 using System.IO;
+using TMPro;
 using UnityEditor;
 using UnityEngine;
 
@@ -10,6 +11,77 @@ namespace StickmanBeatEmUp.Editor
     public static class SpriteHelper
     {
         private const string SPRITES_FOLDER = "Assets/Sprites/Placeholders";
+        private const string VN_FONT_TTF_PATH = "Assets/Fonts/SegoeUIBoldVN.ttf";
+        private const string VN_TMP_FONT_ASSET_PATH = "Assets/Resources/Fonts/SegoeUIBoldVN SDF.asset";
+
+        public static TMP_FontAsset GetOrCreateVietnameseTmpFontAsset()
+        {
+            TMP_FontAsset existing = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(VN_TMP_FONT_ASSET_PATH);
+            if (existing != null &&
+                existing.material != null &&
+                existing.atlasTextures != null &&
+                existing.atlasTextures.Length > 0 &&
+                existing.atlasTextures[0] != null)
+            {
+                return existing;
+            }
+
+            if (existing != null)
+            {
+                AssetDatabase.DeleteAsset(VN_TMP_FONT_ASSET_PATH);
+            }
+
+            EnsureFolder("Assets/Resources/Fonts");
+
+            Font sourceFont = AssetDatabase.LoadAssetAtPath<Font>(VN_FONT_TTF_PATH);
+            if (sourceFont == null)
+            {
+                Debug.LogWarning($"[SpriteHelper] Không tìm thấy font nguồn tại '{VN_FONT_TTF_PATH}'.");
+                return null;
+            }
+
+            TMP_FontAsset created = TMP_FontAsset.CreateFontAsset(sourceFont);
+            if (created == null)
+            {
+                Debug.LogWarning("[SpriteHelper] TMP_FontAsset.CreateFontAsset trả về null.");
+                return null;
+            }
+
+            created.name = "SegoeUIBoldVN SDF";
+            created.hideFlags = HideFlags.None;
+
+            AssetDatabase.CreateAsset(created, VN_TMP_FONT_ASSET_PATH);
+
+            if (created.atlasTextures != null)
+            {
+                for (int i = 0; i < created.atlasTextures.Length; i++)
+                {
+                    Texture2D atlas = created.atlasTextures[i];
+                    if (atlas == null) continue;
+                    atlas.name = i == 0 ? "SegoeUIBoldVN SDF Atlas" : $"SegoeUIBoldVN SDF Atlas {i}";
+                    atlas.hideFlags = HideFlags.None;
+                    if (string.IsNullOrEmpty(AssetDatabase.GetAssetPath(atlas)))
+                    {
+                        AssetDatabase.AddObjectToAsset(atlas, created);
+                    }
+                }
+            }
+
+            if (created.material != null)
+            {
+                created.material.name = "SegoeUIBoldVN SDF Material";
+                created.material.hideFlags = HideFlags.None;
+                if (string.IsNullOrEmpty(AssetDatabase.GetAssetPath(created.material)))
+                {
+                    AssetDatabase.AddObjectToAsset(created.material, created);
+                }
+            }
+
+            EditorUtility.SetDirty(created);
+            AssetDatabase.SaveAssets();
+            AssetDatabase.ImportAsset(VN_TMP_FONT_ASSET_PATH, ImportAssetOptions.ForceUpdate);
+            return AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(VN_TMP_FONT_ASSET_PATH);
+        }
 
         public static Sprite GetOrCreateSquareSprite()
         {
@@ -134,19 +206,67 @@ namespace StickmanBeatEmUp.Editor
                 return;
             }
 
+            // Preserve Multiple SpriteMode & slices on VFX sprite sheets (e.g., HitSpark_Sheet.png)
+            if (normalized.StartsWith("Assets/Sprites/VFX/") &&
+                (normalized.EndsWith("_Sheet.png") || importer.spriteImportMode == SpriteImportMode.Multiple))
+            {
+                bool sheetDirty =
+                    importer.textureType != TextureImporterType.Sprite ||
+                    importer.filterMode != FilterMode.Bilinear ||
+                    !importer.alphaIsTransparency ||
+                    importer.mipmapEnabled ||
+                    importer.textureCompression != TextureImporterCompression.Uncompressed;
+                if (sheetDirty)
+                {
+                    importer.textureType = TextureImporterType.Sprite;
+                    importer.filterMode = FilterMode.Bilinear;
+                    importer.alphaIsTransparency = true;
+                    importer.mipmapEnabled = false;
+                    importer.textureCompression = TextureImporterCompression.Uncompressed;
+                    importer.SaveAndReimport();
+                }
+                return;
+            }
+
             bool isUI = normalized.StartsWith("Assets/Sprites/UI/");
-            bool isMap = normalized.StartsWith("Assets/Sprites/Maps/");
-            bool isCharacterOrEnemy = normalized.StartsWith("Assets/Sprites/Characters/") || normalized.StartsWith("Assets/Sprites/Enemies/");
-            float targetPpu = (isUI || isMap) ? 100f : 160f;
+            bool isSlicedUI = normalized.StartsWith("Assets/Sprites/UI/SlicedUI/");
+            bool isGlassUI = normalized.StartsWith("Assets/Sprites/UI/Glassmorphism/") ||
+                             normalized.StartsWith("Assets/Sprites/UI/GlassHUD/") ||
+                             normalized.StartsWith("Assets/Sprites/UI/Glass/") ||
+                             isSlicedUI;
+            bool isVfxSingle = normalized.StartsWith("Assets/Sprites/VFX/");
+            bool isCombatSkill = normalized.StartsWith("Assets/Sprites/Combat/Skills/");
+            bool isProtectFrame = normalized.StartsWith("Assets/Sprites/ProtectFrames/");
+            bool isCharacterOrEnemy = normalized.StartsWith("Assets/Sprites/Characters/") || normalized.StartsWith("Assets/Sprites/Enemies/") || isProtectFrame;
+            float targetPpu = (isUI || normalized.StartsWith("Assets/Sprites/Maps/") || isVfxSingle || isCombatSkill) ? 100f : 160f;
             int targetMaxSize = isUI ? 2048 : 4096;
+            if (isSlicedUI && TryReadPngDimensions(normalized, out int pngW, out int pngH) && (pngW > 2048 || pngH > 2048))
+            {
+                targetMaxSize = 4096;
+            }
 
             string fileName = Path.GetFileName(normalized);
             bool isKiGeyserHazard = normalized == "Assets/Sprites/Combat/Hazards/Hazard_KiGeyser.png";
-            bool hasCustomPivot = isCharacterOrEnemy || isKiGeyserHazard;
+            bool hasCustomPivot = isCharacterOrEnemy || isKiGeyserHazard || isVfxSingle || isCombatSkill;
 
             SpriteAlignment targetAlignment = SpriteAlignment.Center;
             Vector2 targetPivot = new Vector2(0.5f, 0.5f);
-            if (isCharacterOrEnemy)
+            if (isProtectFrame && (fileName.Contains("_Protect_17x") || fileName.Contains("Shield")))
+            {
+                targetAlignment = SpriteAlignment.BottomCenter;
+                targetPivot = new Vector2(0.5f, 0.0f);
+            }
+            else if (isCombatSkill)
+            {
+                targetAlignment = SpriteAlignment.Custom;
+                targetPivot = new Vector2(0.045f, 0.5f);
+            }
+            else if (isVfxSingle)
+            {
+                targetAlignment = SpriteAlignment.Center;
+                targetPivot = new Vector2(0.5f, 0.5f);
+            }
+            else if (isCharacterOrEnemy)
             {
                 if (fileName == "Mecha_LeftArm.png")
                 {
@@ -178,7 +298,8 @@ namespace StickmanBeatEmUp.Editor
             TextureImporterSettings texSettings = new TextureImporterSettings();
             importer.ReadTextureSettings(texSettings);
 
-            bool meshDirty = texSettings.spriteMeshType != SpriteMeshType.Tight;
+            SpriteMeshType desiredMeshType = (isGlassUI || isCombatSkill) ? SpriteMeshType.FullRect : SpriteMeshType.Tight;
+            bool meshDirty = texSettings.spriteMeshType != desiredMeshType;
             bool pivotDirty = hasCustomPivot && (
                 texSettings.spriteAlignment != (int)targetAlignment ||
                 Vector2.Distance(texSettings.spritePivot, targetPivot) > 0.005f
@@ -198,6 +319,7 @@ namespace StickmanBeatEmUp.Editor
 
             if (dirty)
             {
+                Vector4 preservedBorder = importer.spriteBorder;
                 importer.textureType = TextureImporterType.Sprite;
                 importer.spriteImportMode = SpriteImportMode.Single;
                 importer.spritePixelsPerUnit = targetPpu;
@@ -206,13 +328,21 @@ namespace StickmanBeatEmUp.Editor
                 importer.mipmapEnabled = false;
                 importer.textureCompression = TextureImporterCompression.Uncompressed;
                 importer.maxTextureSize = targetMaxSize;
+                if (isGlassUI && preservedBorder != Vector4.zero)
+                {
+                    importer.spriteBorder = preservedBorder;
+                }
 
                 importer.ReadTextureSettings(texSettings);
-                texSettings.spriteMeshType = SpriteMeshType.Tight;
+                texSettings.spriteMeshType = desiredMeshType;
                 if (hasCustomPivot)
                 {
                     texSettings.spriteAlignment = (int)targetAlignment;
                     texSettings.spritePivot = targetPivot;
+                }
+                if (isGlassUI && preservedBorder != Vector4.zero)
+                {
+                    texSettings.spriteBorder = preservedBorder;
                 }
                 importer.SetTextureSettings(texSettings);
 
@@ -246,6 +376,40 @@ namespace StickmanBeatEmUp.Editor
                     AssetDatabase.CreateFolder(current, parts[i]);
                 }
                 current = next;
+            }
+        }
+
+        private static bool TryReadPngDimensions(string assetPath, out int width, out int height)
+        {
+            width = 0;
+            height = 0;
+            string projectRoot = Path.GetDirectoryName(Application.dataPath);
+            if (string.IsNullOrEmpty(projectRoot) || string.IsNullOrEmpty(assetPath))
+            {
+                return false;
+            }
+
+            string fullPath = Path.Combine(projectRoot, assetPath.Replace('/', Path.DirectorySeparatorChar));
+            if (!File.Exists(fullPath))
+            {
+                return false;
+            }
+
+            using (FileStream fs = new FileStream(fullPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+            {
+                if (fs.Length < 24) return false;
+                byte[] hdr = new byte[24];
+                if (fs.Read(hdr, 0, 24) < 24) return false;
+
+                // PNG signature (89 50 4E 47) + IHDR width/height big-endian at offsets 16..23
+                if (hdr[0] != 0x89 || hdr[1] != 0x50 || hdr[2] != 0x4E || hdr[3] != 0x47)
+                {
+                    return false;
+                }
+
+                width = (hdr[16] << 24) | (hdr[17] << 16) | (hdr[18] << 8) | hdr[19];
+                height = (hdr[20] << 24) | (hdr[21] << 16) | (hdr[22] << 8) | hdr[23];
+                return width > 0 && height > 0;
             }
         }
     }

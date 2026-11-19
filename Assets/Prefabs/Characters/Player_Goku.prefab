@@ -274,8 +274,8 @@ Transform:
   m_GameObject: {fileID: 7067065843568355181}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0.32, y: 0.9, z: 0}
-  m_LocalScale: {x: 1.1, y: 1.1, z: 1}
+  m_LocalPosition: {x: 0, y: 0.85, z: 0}
+  m_LocalScale: {x: 1.7, y: 1.7, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 2879265087474873968}
@@ -330,7 +330,7 @@ SpriteRenderer:
   m_SortingOrder: 8
   m_MaskInteraction: 0
   m_Sprite: {fileID: 21300000, guid: 6d500055de1e7d248a55f44c0ea9a519, type: 3}
-  m_Color: {r: 0.75, g: 0.95, b: 1, a: 0.85}
+  m_Color: {r: 0.85, g: 0.98, b: 1, a: 0.72}
   m_FlipX: 0
   m_FlipY: 0
   m_DrawMode: 0
@@ -749,6 +749,8 @@ MonoBehaviour:
   blockDuration: 0.75
   blockCooldown: 0
   blockDamageMultiplier: 0.2
+  hurtDuration: 0.15
+  stunImmunityDuration: 0.4
   kiBlastPrefab: {fileID: 7734812195386514462, guid: d4afaa5f0060b3944b58eebf5251ec40, type: 3}
   kiExplosionPrefab: {fileID: 1290417283517503035, guid: 426ef52e8ede41249948c47c7dfd5f75, type: 3}
   kamehamehaPrefab: {fileID: 4329788682100116286, guid: 7a0188b78f2239c46a353bd73834e03b, type: 3}

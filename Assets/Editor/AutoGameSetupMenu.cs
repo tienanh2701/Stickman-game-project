@@ -9,6 +9,7 @@ using StickmanBeatEmUp.Enemies;
 using StickmanBeatEmUp.Environment;
 using StickmanBeatEmUp.GameModes;
 using StickmanBeatEmUp.Level;
+using StickmanGame.VFX;
 
 namespace StickmanBeatEmUp.Editor
 {
@@ -19,16 +20,43 @@ namespace StickmanBeatEmUp.Editor
     [InitializeOnLoad]
     public static class AutoGameSetupMenu
     {
-        private const string SETUP_VERSION_TAG = "SETUP_VERSION=v11_autotrim_training_endless";
+        private const string SETUP_VERSION_TAG = "SETUP_VERSION=v16_fix_entry_and_all_buttons";
         private static bool queuedAutoCheck = false;
+        private static bool pendingInteractiveSetupAfterStop = false;
 
         static AutoGameSetupMenu()
         {
+            EditorApplication.playModeStateChanged -= OnPlayModeStateChanged;
+            EditorApplication.playModeStateChanged += OnPlayModeStateChanged;
+
             if (!queuedAutoCheck)
             {
                 queuedAutoCheck = true;
                 Debug.Log("[AutoGameSetupMenu] Static ctor initialized, hooking EditorApplication.update.");
+                EditorApplication.update -= OnFirstEditorUpdate;
                 EditorApplication.update += OnFirstEditorUpdate;
+            }
+        }
+
+        private static void OnPlayModeStateChanged(PlayModeStateChange state)
+        {
+            if (state != PlayModeStateChange.EnteredEditMode) return;
+
+            if (EditorApplication.isCompiling || EditorApplication.isUpdating)
+            {
+                EditorApplication.update -= OnFirstEditorUpdate;
+                EditorApplication.update += OnFirstEditorUpdate;
+                return;
+            }
+
+            if (pendingInteractiveSetupAfterStop)
+            {
+                pendingInteractiveSetupAfterStop = false;
+                RunSetupInternal(interactive: true);
+            }
+            else
+            {
+                TryAutoRunOnce();
             }
         }
 
@@ -39,7 +67,19 @@ namespace StickmanBeatEmUp.Editor
                 return;
             }
 
+            if (EditorApplication.isPlayingOrWillChangePlaymode)
+            {
+                return;
+            }
+
             EditorApplication.update -= OnFirstEditorUpdate;
+            if (pendingInteractiveSetupAfterStop)
+            {
+                pendingInteractiveSetupAfterStop = false;
+                RunSetupInternal(interactive: true);
+                return;
+            }
+
             TryAutoRunOnce();
         }
 
@@ -48,6 +88,10 @@ namespace StickmanBeatEmUp.Editor
             if (Application.isBatchMode)
             {
                 Debug.Log("[AutoGameSetupMenu] Skipped TryAutoRunOnce: batchMode=true");
+                return;
+            }
+            if (EditorApplication.isCompiling || EditorApplication.isUpdating)
+            {
                 return;
             }
             if (EditorApplication.isPlayingOrWillChangePlaymode)
@@ -87,12 +131,68 @@ namespace StickmanBeatEmUp.Editor
         [MenuItem("Tools/Setup Game Automatically", false, 1)]
         public static void FullAutoSetupGame()
         {
+            if (EditorApplication.isPlayingOrWillChangePlaymode)
+            {
+                pendingInteractiveSetupAfterStop = true;
+                EditorApplication.isPlaying = false;
+                Debug.Log("[AutoGameSetupMenu] Đang thoát Play Mode để chạy Setup tự động...");
+                return;
+            }
+
             RunSetupInternal(interactive: true);
         }
 
         public static void RunSetupBatchMode()
         {
             RunSetupInternal(interactive: false);
+        }
+
+        public static void RebuildScenesBatchMode()
+        {
+            string projectRoot = Path.GetDirectoryName(Application.dataPath);
+            string logsDir = Path.Combine(projectRoot, "Logs");
+            string markerPath = Path.Combine(logsDir, "AutoSetupResult.txt");
+
+            try
+            {
+                TagAndLayerSetup.EnsureTagsAndLayers();
+                PlayerSettings.productName = "MULTI-DIMENSION STICKMAN";
+                SpriteHelper.GetOrCreateVietnameseTmpFontAsset();
+
+                string battleScenePath = BuildBattleScene(null, null, null, null, null);
+                string selectScenePath = CharacterSelectSceneBuilder.BuildCharacterSelectScene();
+                string mainMenuScenePath = MainMenuSceneBuilder.BuildMainMenuScene(interactive: false);
+
+                EditorBuildSettings.scenes = new[]
+                {
+                    new EditorBuildSettingsScene(mainMenuScenePath, true),
+                    new EditorBuildSettingsScene(battleScenePath, true),
+                    new EditorBuildSettingsScene(selectScenePath, true)
+                };
+
+                AssetDatabase.SaveAssets();
+                AssetDatabase.Refresh();
+                EditorSceneManager.OpenScene(mainMenuScenePath, OpenSceneMode.Single);
+
+                Directory.CreateDirectory(logsDir);
+                string summary =
+                    $"{SETUP_VERSION_TAG}\n" +
+                    $"Timestamp={DateTime.Now:yyyy-MM-dd HH:mm:ss}\n" +
+                    $"StagesCount=12\n" +
+                    $"BuildScenes={mainMenuScenePath};{battleScenePath};{selectScenePath}\n" +
+                    "RebuildMode=ScenesOnly\n" +
+                    "Prefabs=Player_Goku,Player_Eren,Player_Diend,Enemy_Grunt,Enemy_Ranger,Enemy_Kamikaze,Enemy_EliteBruiser,Boss_Warlord,LordKivaAI,W3_Boss_MechaColossus\n";
+                File.WriteAllText(markerPath, summary);
+
+                Debug.Log("[AutoGameSetupMenu] RebuildScenesBatchMode hoàn tất 3 scene + SegoeUIBoldVN SDF.asset.");
+            }
+            catch (Exception ex)
+            {
+                Directory.CreateDirectory(logsDir);
+                File.WriteAllText(markerPath, $"REBUILD_SCENES_FAILED\n{ex}");
+                Debug.LogException(ex);
+                throw;
+            }
         }
 
         private static void RunSetupInternal(bool interactive)
@@ -463,6 +563,10 @@ namespace StickmanBeatEmUp.Editor
             AssignObjectArray(spawnerSO.FindProperty("elitePrefabs"), elitePool);
 
             spawnerSO.ApplyModifiedProperties();
+
+            // 6d. HitSparkManager Pool (20 Pooled Objects)
+            GameObject vfxObj = new GameObject("HitSparkManager");
+            vfxObj.AddComponent<HitSparkManager>();
 
             // 7. Lưu Scene
             SpriteHelper.EnsureFolder("Assets/Scenes");
