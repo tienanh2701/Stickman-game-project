@@ -2,6 +2,8 @@ using System.Collections;
 using UnityEngine;
 using StickmanBeatEmUp.Core;
 using StickmanBeatEmUp.Level;
+using StickmanBeatEmUp.UI;
+using StickmanGame.VFX;
 
 namespace StickmanBeatEmUp.Enemies
 {
@@ -166,6 +168,9 @@ namespace StickmanBeatEmUp.Enemies
             }
             else
             {
+                Vector3 hitPos = HitSparkManager.ResolveHitPoint(transform, mainCol, spriteRenderer, damageData.attacker);
+                HitSparkManager.Spawn(hitPos, HitSparkManager.ShieldBlockCyanColor, 1.15f);
+                DamagePopupManager.SpawnBlocked(hitPos);
                 TriggerWhiteFlash();
             }
         }

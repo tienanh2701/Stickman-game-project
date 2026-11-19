@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
@@ -38,6 +39,14 @@ namespace StickmanBeatEmUp.GameModes
         }
 
         private const float MinSpawnSeparation = 1.35f;
+        public const int MaxSpawnedTrainingUnits = 30;
+        private const float SpawnScrollStepNormalized = 0.35f;
+        private const float SpawnScrollLerpDuration = 0.18f;
+
+        private static readonly Color SpawnCardTextColor = new Color(0.933f, 0.965f, 1f, 1f);
+        private static readonly Color ArrowKeycapTextColor = new Color(0.75f, 0.96f, 1f, 1f);
+        private static readonly Color ToggleOnTextColor = Color.white;
+        private static readonly Color ToggleOffTextColor = new Color(0.80f, 0.87f, 0.96f, 1f);
 
         [Header("Arena Bounds")]
         [SerializeField] private float arenaMinX = -22f;
@@ -72,11 +81,26 @@ namespace StickmanBeatEmUp.GameModes
         [SerializeField] private TMP_Text[] spawnButtonLabels;
         [SerializeField] private Image[] spawnIcons;
 
+        [Header("09_TrainingSpawnerDock Sprites (Standalone Safety)")]
+        [SerializeField] private Sprite dockFrameSprite;
+        [SerializeField] private Sprite toggleOffSprite;
+        [SerializeField] private Sprite toggleOnSprite;
+        [SerializeField] private Sprite blueLedOrbSprite;
+        [SerializeField] private Sprite plasmaDividerSprite;
+        [SerializeField] private Sprite spawnCardSprite;
+        [SerializeField] private Sprite clearAllSprite;
+        [SerializeField] private Sprite arrowButtonSprite;
+        [SerializeField] private Sprite clearTrashIconSprite;
+
         private LevelManager levelManager;
         private BaseCharacter activePlayer;
         private bool isActive;
         private float nextMaintenanceTime;
         private readonly List<GameObject> spawnedUnits = new List<GameObject>();
+        private Button scrollLeftButton;
+        private Button scrollRightButton;
+        private Coroutine spawnScrollLerpCoroutine;
+        private float spawnScrollTargetNormalized;
 
         public float ArenaMinX => arenaMinX;
         public float ArenaMaxX => arenaMaxX;
@@ -122,7 +146,10 @@ namespace StickmanBeatEmUp.GameModes
             spawnButtons = spawnBtns;
             spawnButtonLabels = spawnLbls;
 
+            CacheDockSpritesIfMissing();
             DiscoverMissingTopBarRefs();
+            EnsureSpawnScrollBarConfigured();
+            ApplySleekGlassTrainingTheme();
 
             if (!isActive && trainingPanel != null)
             {
@@ -165,6 +192,11 @@ namespace StickmanBeatEmUp.GameModes
             spawnButtonLabels = spawnLbls;
             spawnIcons = spawnIconImgs;
 
+            CacheDockSpritesIfMissing();
+            DiscoverMissingTopBarRefs();
+            EnsureSpawnScrollBarConfigured();
+            ApplySleekGlassTrainingTheme();
+
             if (!isActive && trainingPanel != null)
             {
                 trainingPanel.SetActive(false);
@@ -192,6 +224,27 @@ namespace StickmanBeatEmUp.GameModes
             }
         }
 
+        private void Start()
+        {
+            CacheDockSpritesIfMissing();
+            DiscoverMissingTopBarRefs();
+            EnsureSpawnScrollBarConfigured();
+            ApplySleekGlassTrainingTheme();
+        }
+
+        private void CacheDockSpritesIfMissing()
+        {
+            if (dockFrameSprite == null) dockFrameSprite = GlassHudTheme.LoadSprite("09_TrainingSpawnerDock/Frame_Training_MainDock_Clean.png");
+            if (toggleOffSprite == null) toggleOffSprite = GlassHudTheme.LoadSprite("09_TrainingSpawnerDock/Toggle_Training_OptionPill_Blank.png");
+            if (toggleOnSprite == null) toggleOnSprite = GlassHudTheme.LoadSprite("09_TrainingSpawnerDock/Toggle_Training_OptionPill_BlueLED_Clean.png");
+            if (blueLedOrbSprite == null) blueLedOrbSprite = GlassHudTheme.LoadSprite("09_TrainingSpawnerDock/Icon_Training_BlueLEDOrb.png");
+            if (plasmaDividerSprite == null) plasmaDividerSprite = GlassHudTheme.LoadSprite("09_TrainingSpawnerDock/Divider_Training_PlasmaTube_Violet.png");
+            if (spawnCardSprite == null) spawnCardSprite = GlassHudTheme.LoadSprite("09_TrainingSpawnerDock/Slot_Training_EnemySpawnCard_Clean.png");
+            if (clearAllSprite == null) clearAllSprite = GlassHudTheme.LoadSprite("09_TrainingSpawnerDock/Btn_Training_ClearAll_RedRing_Clean.png");
+            if (arrowButtonSprite == null) arrowButtonSprite = GlassHudTheme.LoadSprite("Keycap_Badge_Dark.png");
+            if (clearTrashIconSprite == null) clearTrashIconSprite = GlassHudTheme.LoadSprite("Icon_Trash_Red.png");
+        }
+
         public void BeginTraining(LevelManager manager, BaseCharacter player)
         {
             if (!gameObject.activeSelf)
@@ -200,6 +253,13 @@ namespace StickmanBeatEmUp.GameModes
             }
             enabled = true;
             Instance = this;
+
+            if (spawnScrollLerpCoroutine != null)
+            {
+                StopCoroutine(spawnScrollLerpCoroutine);
+                spawnScrollLerpCoroutine = null;
+            }
+            spawnScrollTargetNormalized = 0f;
 
             levelManager = manager;
             isActive = true;
@@ -221,13 +281,25 @@ namespace StickmanBeatEmUp.GameModes
 
             EnsureRosterPopulated();
             EnsureTrainingPanelExists();
+            CacheDockSpritesIfMissing();
             DiscoverMissingTopBarRefs();
 
             if (trainingPanel != null)
             {
                 trainingPanel.SetActive(true);
+                EnsureBossPanelClearsTrainingDock();
             }
+            EnsureSpawnScrollBarConfigured();
+            ApplySleekGlassTrainingTheme();
             WireUiControls();
+
+            ScrollRect spawnScroll = trainingPanel != null
+                ? trainingPanel.GetComponentInChildren<ScrollRect>(true)
+                : null;
+            if (spawnScroll != null)
+            {
+                spawnScroll.horizontalNormalizedPosition = 0f;
+            }
 
             GameUIManager.Instance?.ConfigureModeHud(GameMode.Training);
             levelManager?.NotifyWaveChanged(0, 0);
@@ -301,6 +373,11 @@ namespace StickmanBeatEmUp.GameModes
 
         private void OnDisable()
         {
+            if (spawnScrollLerpCoroutine != null)
+            {
+                StopCoroutine(spawnScrollLerpCoroutine);
+                spawnScrollLerpCoroutine = null;
+            }
             ResetSandboxOverrides();
         }
 
@@ -436,6 +513,13 @@ namespace StickmanBeatEmUp.GameModes
         {
             if (prefab == null) return null;
 
+            PruneDeadSpawnedUnits();
+            if (spawnedUnits.Count >= MaxSpawnedTrainingUnits)
+            {
+                Debug.LogWarning($"[TrainingModeManager] Đã đạt giới hạn tối đa {MaxSpawnedTrainingUnits} mục tiêu tập luyện.");
+                return null;
+            }
+
             List<float> occupiedXs = CollectAliveEnemyXs();
             float playerX = activePlayer != null ? activePlayer.transform.position.x : 0f;
             int dir = (activePlayer != null && activePlayer.FacingDirection < 0) ? -1 : 1;
@@ -525,6 +609,7 @@ namespace StickmanBeatEmUp.GameModes
 
             GameObject obj = Instantiate(prefab, new Vector3(chosenX, groundY, 0f), Quaternion.identity);
             spawnedUnits.Add(obj);
+            EnsureBossPanelClearsTrainingDock();
 
             BossBase boss = obj.GetComponent<BossBase>();
             if (boss != null)
@@ -559,6 +644,39 @@ namespace StickmanBeatEmUp.GameModes
             }
 
             return obj;
+        }
+
+        private void PruneDeadSpawnedUnits()
+        {
+            for (int i = spawnedUnits.Count - 1; i >= 0; i--)
+            {
+                GameObject unit = spawnedUnits[i];
+                if (unit == null)
+                {
+                    spawnedUnits.RemoveAt(i);
+                    continue;
+                }
+
+                EnemyBase eb = unit.GetComponent<EnemyBase>();
+                if (eb != null && eb.IsDead)
+                {
+                    spawnedUnits.RemoveAt(i);
+                    continue;
+                }
+
+                BossBase bb = unit.GetComponent<BossBase>();
+                if (bb != null && bb.IsDead)
+                {
+                    spawnedUnits.RemoveAt(i);
+                    continue;
+                }
+
+                BaseEnemy le = unit.GetComponent<BaseEnemy>();
+                if (le != null && le.IsDead)
+                {
+                    spawnedUnits.RemoveAt(i);
+                }
+            }
         }
 
         private static bool IsCandidatePositionValid(float candidateX, float playerX, List<float> occupiedXs)
@@ -653,6 +771,10 @@ namespace StickmanBeatEmUp.GameModes
                     playerInvincibleLabel = t.GetComponentInChildren<TMP_Text>(true);
                 }
             }
+            if (playerInvincibleLabel == null && EffectivePlayerInvincibleButton != null)
+            {
+                playerInvincibleLabel = EffectivePlayerInvincibleButton.GetComponentInChildren<TMP_Text>(true);
+            }
 
             if (autoRageButton == null)
             {
@@ -664,6 +786,10 @@ namespace StickmanBeatEmUp.GameModes
                     autoRageLabel = t.GetComponentInChildren<TMP_Text>(true);
                 }
             }
+            if (autoRageLabel == null && autoRageButton != null)
+            {
+                autoRageLabel = autoRageButton.GetComponentInChildren<TMP_Text>(true);
+            }
 
             if (enemyAiButton == null)
             {
@@ -674,6 +800,10 @@ namespace StickmanBeatEmUp.GameModes
                     enemyAiLabel = t.GetComponentInChildren<TMP_Text>(true);
                 }
             }
+            if (enemyAiLabel == null && enemyAiButton != null)
+            {
+                enemyAiLabel = enemyAiButton.GetComponentInChildren<TMP_Text>(true);
+            }
 
             if (enemyInvincibleButton == null)
             {
@@ -682,6 +812,37 @@ namespace StickmanBeatEmUp.GameModes
                 {
                     enemyInvincibleButton = t.GetComponent<Button>();
                     enemyInvincibleLabel = t.GetComponentInChildren<TMP_Text>(true);
+                }
+            }
+            if (enemyInvincibleLabel == null && enemyInvincibleButton != null)
+            {
+                enemyInvincibleLabel = enemyInvincibleButton.GetComponentInChildren<TMP_Text>(true);
+            }
+
+            if (clearAllButton == null)
+            {
+                Transform t = FindChildRecursive(trainingPanel.transform, "ClearAllEnemiesButton");
+                if (t != null)
+                {
+                    clearAllButton = t.GetComponent<Button>();
+                }
+            }
+
+            if (scrollLeftButton == null)
+            {
+                Transform t = FindChildRecursive(trainingPanel.transform, "ScrollLeftButton");
+                if (t != null)
+                {
+                    scrollLeftButton = t.GetComponent<Button>();
+                }
+            }
+
+            if (scrollRightButton == null)
+            {
+                Transform t = FindChildRecursive(trainingPanel.transform, "ScrollRightButton");
+                if (t != null)
+                {
+                    scrollRightButton = t.GetComponent<Button>();
                 }
             }
 
@@ -741,6 +902,7 @@ namespace StickmanBeatEmUp.GameModes
                 clearAllButton.onClick.RemoveAllListeners();
                 clearAllButton.onClick.AddListener(ClearAllEnemies);
             }
+            WireCarouselArrowButtons();
             BindSpawnButtons();
             RefreshToggleLabels();
         }
@@ -790,6 +952,9 @@ namespace StickmanBeatEmUp.GameModes
                     iconImg.enabled = iconImg.sprite != null;
                 }
             }
+
+            EnsureSpawnScrollBarConfigured();
+            ApplySleekGlassTrainingTheme();
         }
 
         private static string FormatConciseSpawnTag(string fullName, GameObject prefab)
@@ -837,51 +1002,29 @@ namespace StickmanBeatEmUp.GameModes
 
         private void RefreshToggleLabels()
         {
-            TMP_Text invLbl = EffectivePlayerInvincibleLabel;
-            Button invBtn = EffectivePlayerInvincibleButton;
-            if (invLbl != null)
-            {
-                invLbl.text = playerInvincible ? "BẤT TỬ PLAYER: BẬT" : "BẤT TỬ PLAYER: TẮT";
-            }
-            if (invBtn != null && invBtn.image != null)
-            {
-                invBtn.image.color = playerInvincible
-                    ? new Color(0.16f, 0.62f, 0.32f, 0.96f)
-                    : new Color(0.28f, 0.31f, 0.37f, 0.95f);
-            }
+            StyleToggleButton(
+                EffectivePlayerInvincibleButton,
+                EffectivePlayerInvincibleLabel,
+                playerInvincible ? "BẤT TỬ: BẬT" : "BẤT TỬ: TẮT",
+                playerInvincible);
 
-            if (autoRageLabel != null)
-            {
-                autoRageLabel.text = autoRageEnabled ? "MAX NỘ: BẬT" : "MAX NỘ: TẮT";
-            }
-            if (autoRageButton != null && autoRageButton.image != null)
-            {
-                autoRageButton.image.color = autoRageEnabled
-                    ? new Color(0.82f, 0.46f, 0.10f, 0.96f)
-                    : new Color(0.28f, 0.31f, 0.37f, 0.95f);
-            }
+            StyleToggleButton(
+                autoRageButton,
+                autoRageLabel,
+                autoRageEnabled ? "MAX NỘ: BẬT" : "MAX NỘ: TẮT",
+                autoRageEnabled);
 
-            if (enemyAiLabel != null)
-            {
-                enemyAiLabel.text = enableEnemyAI ? "AI QUÁI: BẬT" : "AI QUÁI: TẮT";
-            }
-            if (enemyAiButton != null && enemyAiButton.image != null)
-            {
-                enemyAiButton.image.color = enableEnemyAI
-                    ? new Color(0.16f, 0.58f, 0.34f, 0.96f)
-                    : new Color(0.68f, 0.20f, 0.22f, 0.96f);
-            }
+            StyleToggleButton(
+                enemyAiButton,
+                enemyAiLabel,
+                enableEnemyAI ? "AI QUÁI: BẬT" : "AI QUÁI: TẮT",
+                enableEnemyAI);
 
-            if (enemyInvincibleLabel != null)
-            {
-                enemyInvincibleLabel.text = enemyInvincible ? "BẤT TỬ QUÁI: BẬT" : "BẤT TỬ QUÁI: TẮT";
-            }
-            if (enemyInvincibleButton != null && enemyInvincibleButton.image != null)
-            {
-                enemyInvincibleButton.image.color = enemyInvincible
-                    ? new Color(0.78f, 0.48f, 0.12f, 0.96f)
-                    : new Color(0.28f, 0.31f, 0.37f, 0.95f);
-            }
+            StyleToggleButton(
+                enemyInvincibleButton,
+                enemyInvincibleLabel,
+                enemyInvincible ? "QUÁI BẤT TỬ: BẬT" : "QUÁI BẤT TỬ: TẮT",
+                enemyInvincible);
         }
 
         private void EnsureRosterPopulated()
@@ -958,7 +1101,828 @@ namespace StickmanBeatEmUp.GameModes
             outList.Add(new TrainingUnitEntry { displayName = display, prefab = prefab });
         }
 
+        public void EnsureSpawnScrollBarConfigured()
+        {
+            if (trainingPanel == null) return;
+
+            ScrollRect sr = trainingPanel.GetComponentInChildren<ScrollRect>(true);
+            if (sr == null) return;
+
+            sr.horizontal = true;
+            sr.vertical = false;
+            sr.movementType = ScrollRect.MovementType.Elastic;
+            sr.elasticity = 0.08f;
+            sr.inertia = true;
+            sr.decelerationRate = 0.135f;
+            sr.scrollSensitivity = 28f;
+
+            Image scrollImg = sr.GetComponent<Image>();
+            if (scrollImg == null)
+            {
+                scrollImg = sr.gameObject.AddComponent<Image>();
+            }
+            scrollImg.sprite = null;
+            scrollImg.color = new Color(0f, 0f, 0f, 0.01f);
+            scrollImg.raycastTarget = true;
+
+            RectTransform vpRt = sr.viewport;
+            if (vpRt == null)
+            {
+                Transform vpTf = FindChildRecursive(sr.transform, "Viewport");
+                if (vpTf != null) vpRt = vpTf.GetComponent<RectTransform>();
+            }
+            if (vpRt != null)
+            {
+                sr.viewport = vpRt;
+                vpRt.anchorMin = Vector2.zero;
+                vpRt.anchorMax = Vector2.one;
+                vpRt.pivot = new Vector2(0.5f, 0.5f);
+                vpRt.offsetMin = new Vector2(2f, 1f);
+                vpRt.offsetMax = new Vector2(-2f, -1f);
+
+                Image vpImg = vpRt.GetComponent<Image>();
+                if (vpImg == null)
+                {
+                    vpImg = vpRt.gameObject.AddComponent<Image>();
+                }
+                vpImg.sprite = null;
+                vpImg.color = new Color(0f, 0f, 0f, 0.01f);
+                vpImg.raycastTarget = true;
+                if (vpRt.GetComponent<RectMask2D>() == null)
+                {
+                    vpRt.gameObject.AddComponent<RectMask2D>();
+                }
+            }
+
+            RectTransform contentRt = sr.content;
+            if (contentRt == null)
+            {
+                Transform contentTf = FindChildRecursive(sr.transform, "Content");
+                if (contentTf != null) contentRt = contentTf.GetComponent<RectTransform>();
+            }
+            if (contentRt != null)
+            {
+                sr.content = contentRt;
+                contentRt.anchorMin = new Vector2(0f, 0f);
+                contentRt.anchorMax = new Vector2(0f, 1f);
+                contentRt.pivot = new Vector2(0f, 0.5f);
+                contentRt.anchoredPosition = Vector2.zero;
+                contentRt.sizeDelta = Vector2.zero;
+
+                HorizontalLayoutGroup hlg = contentRt.GetComponent<HorizontalLayoutGroup>();
+                if (hlg == null)
+                {
+                    hlg = contentRt.gameObject.AddComponent<HorizontalLayoutGroup>();
+                }
+                hlg.padding = new RectOffset(4, 6, 2, 2);
+                hlg.spacing = 6f;
+                hlg.childAlignment = TextAnchor.MiddleLeft;
+                hlg.childControlWidth = true;
+                hlg.childControlHeight = true;
+                hlg.childForceExpandWidth = false;
+                hlg.childForceExpandHeight = false;
+
+                ContentSizeFitter csf = contentRt.GetComponent<ContentSizeFitter>();
+                if (csf == null)
+                {
+                    csf = contentRt.gameObject.AddComponent<ContentSizeFitter>();
+                }
+                csf.horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
+                csf.verticalFit = ContentSizeFitter.FitMode.Unconstrained;
+
+                for (int i = 0; i < contentRt.childCount; i++)
+                {
+                    Transform child = contentRt.GetChild(i);
+                    if (child != null && child.TryGetComponent(out Button childBtn))
+                    {
+                        ConfigureSpawnButtonForScroll(childBtn, sr);
+                    }
+                }
+            }
+
+            if (spawnButtons != null)
+            {
+                for (int i = 0; i < spawnButtons.Length; i++)
+                {
+                    if (spawnButtons[i] != null)
+                    {
+                        ConfigureSpawnButtonForScroll(spawnButtons[i], sr);
+                    }
+                }
+            }
+
+            if (contentRt != null)
+            {
+                LayoutRebuilder.ForceRebuildLayoutImmediate(contentRt);
+            }
+        }
+
+        private static void ConfigureSpawnButtonForScroll(Button btn, ScrollRect scrollRect)
+        {
+            if (btn == null) return;
+
+            LayoutElement le = btn.GetComponent<LayoutElement>();
+            if (le == null)
+            {
+                le = btn.gameObject.AddComponent<LayoutElement>();
+            }
+            le.minWidth = 64f;
+            le.preferredWidth = 64f;
+            le.minHeight = 74f;
+            le.preferredHeight = 74f;
+            le.flexibleWidth = 0f;
+
+            ScrollEventForwarder fwd = btn.GetComponent<ScrollEventForwarder>();
+            if (fwd == null)
+            {
+                fwd = btn.gameObject.AddComponent<ScrollEventForwarder>();
+            }
+            fwd.Initialize(scrollRect);
+        }
+
+        private void EnsureBossPanelClearsTrainingDock()
+        {
+            Canvas canvas = trainingPanel != null
+                ? trainingPanel.GetComponentInParent<Canvas>()
+                : (GameUIManager.Instance != null ? GameUIManager.Instance.GetComponentInParent<Canvas>() : FindAnyObjectByType<Canvas>());
+            if (canvas == null) return;
+
+            Transform bossPanelTr = canvas.transform.Find("BossHealthPanel");
+            if (bossPanelTr != null)
+            {
+                RectTransform bossRt = bossPanelTr.GetComponent<RectTransform>();
+                if (bossRt != null && bossRt.anchoredPosition.y > -114f)
+                {
+                    bossRt.anchoredPosition = new Vector2(bossRt.anchoredPosition.x, -114f);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Upgrades either a pre-serialized TrainingTopBar or runtime fallback hierarchy
+        /// to the unified 09_TrainingSpawnerDock frame, 2x2 LED pill toggles,
+        /// violet plasma dividers, flanked spawn carousel (&lt; / &gt;), and circular Clear button.
+        /// </summary>
+        public void ApplySleekGlassTrainingTheme()
+        {
+            if (trainingPanel == null) return;
+
+            CacheDockSpritesIfMissing();
+            DiscoverMissingTopBarRefs();
+            if (isActive)
+            {
+                EnsureBossPanelClearsTrainingDock();
+            }
+
+            RectTransform panelRt = trainingPanel.GetComponent<RectTransform>();
+            if (panelRt != null)
+            {
+                panelRt.anchorMin = new Vector2(0.5f, 1f);
+                panelRt.anchorMax = new Vector2(0.5f, 1f);
+                panelRt.pivot = new Vector2(0.5f, 1f);
+                panelRt.anchoredPosition = new Vector2(-12f, -8f);
+                panelRt.sizeDelta = new Vector2(968f, 98f);
+            }
+
+            Image panelImg = GetOrAddImage(trainingPanel);
+            Sprite dockSp = dockFrameSprite != null
+                ? dockFrameSprite
+                : GlassHudTheme.LoadSprite("09_TrainingSpawnerDock/Frame_Training_MainDock_Clean.png");
+            if (dockSp != null)
+            {
+                GlassHudTheme.ApplySlicedSprite(panelImg, dockSp, 968f, 98f, Color.white);
+            }
+            else
+            {
+                GlassHudTheme.ApplySprite(panelImg, "TrainingDock_GlassPanel.png", default, true, false);
+                panelImg.color = panelImg.sprite != null
+                    ? Color.white
+                    : new Color(0.06f, 0.09f, 0.15f, 0.92f);
+            }
+
+            Transform group1 = FindChildRecursive(trainingPanel.transform, "Group1_PlayerControls");
+            ConfigureGroupContainer(group1, new Vector2(14f, 0f), new Vector2(164f, 78f));
+
+            Transform group2 = FindChildRecursive(trainingPanel.transform, "Group2_EnemyControls");
+            ConfigureGroupContainer(group2, new Vector2(182f, 0f), new Vector2(164f, 78f));
+
+            Sprite divSp = plasmaDividerSprite != null
+                ? plasmaDividerSprite
+                : GlassHudTheme.LoadSprite("09_TrainingSpawnerDock/Divider_Training_PlasmaTube_Violet.png");
+            EnsurePlasmaDivider(trainingPanel.transform, "Divider_Left", new Vector2(349f, 0f), new Vector2(16f, 78f), divSp);
+
+            Transform group3 = FindChildRecursive(trainingPanel.transform, "Group3_SpawnAndClear");
+            ConfigureGroupContainer(group3, new Vector2(368f, 0f), new Vector2(588f, 80f));
+
+            ConfigureToggleLayout(EffectivePlayerInvincibleButton, new Vector2(0f, 20f));
+            ConfigureToggleLayout(autoRageButton, new Vector2(0f, -20f));
+            ConfigureToggleLayout(enemyAiButton, new Vector2(0f, 20f));
+            ConfigureToggleLayout(enemyInvincibleButton, new Vector2(0f, -20f));
+            RefreshToggleLabels();
+
+            ScrollRect sr = trainingPanel.GetComponentInChildren<ScrollRect>(true);
+            if (sr != null)
+            {
+                RectTransform scrollRt = sr.GetComponent<RectTransform>();
+                if (scrollRt != null)
+                {
+                    scrollRt.anchorMin = new Vector2(0f, 0.5f);
+                    scrollRt.anchorMax = new Vector2(0f, 0.5f);
+                    scrollRt.pivot = new Vector2(0f, 0.5f);
+                    scrollRt.anchoredPosition = new Vector2(29f, 0f);
+                    scrollRt.sizeDelta = new Vector2(432f, 78f);
+                }
+
+                Image scrollImg = GetOrAddImage(sr.gameObject);
+                scrollImg.sprite = null;
+                scrollImg.color = new Color(0f, 0f, 0f, 0.01f);
+                scrollImg.raycastTarget = true;
+
+                Transform arrowParent = group3 != null ? group3 : sr.transform.parent;
+                TMP_FontAsset sharedFont = FindCanvasTmpFont(trainingPanel.GetComponentInParent<Canvas>());
+
+                scrollLeftButton = EnsureCarouselArrowButton(
+                    arrowParent,
+                    scrollLeftButton,
+                    "ScrollLeftButton",
+                    "<",
+                    new Vector2(13f, 0f),
+                    sharedFont);
+
+                scrollRightButton = EnsureCarouselArrowButton(
+                    arrowParent,
+                    scrollRightButton,
+                    "ScrollRightButton",
+                    ">",
+                    new Vector2(478f, 0f),
+                    sharedFont);
+
+                if (group3 != null)
+                {
+                    EnsurePlasmaDivider(group3, "Divider_Right", new Vector2(493f, 0f), new Vector2(16f, 78f), divSp);
+                }
+
+                if (Application.isPlaying)
+                {
+                    WireCarouselArrowButtons();
+                }
+            }
+
+            StyleAllSpawnCards(sr);
+            StyleClearAllButton();
+
+            if (sr != null && sr.content != null)
+            {
+                LayoutRebuilder.ForceRebuildLayoutImmediate(sr.content);
+            }
+        }
+
+        private static void EnsurePlasmaDivider(Transform parent, string name, Vector2 anchoredPos, Vector2 size, Sprite divSprite)
+        {
+            if (parent == null) return;
+
+            Transform existing = parent.Find(name);
+            GameObject divObj = existing != null
+                ? existing.gameObject
+                : new GameObject(name, typeof(RectTransform), typeof(Image));
+            if (existing == null)
+            {
+                divObj.transform.SetParent(parent, false);
+            }
+
+            RectTransform rt = divObj.GetComponent<RectTransform>();
+            rt.anchorMin = new Vector2(0f, 0.5f);
+            rt.anchorMax = new Vector2(0f, 0.5f);
+            rt.pivot = new Vector2(0f, 0.5f);
+            rt.anchoredPosition = anchoredPos;
+            rt.sizeDelta = size;
+
+            Image img = GetOrAddImage(divObj);
+            img.raycastTarget = false;
+            if (divSprite != null)
+            {
+                GlassHudTheme.ApplySlicedSprite(img, divSprite, size.x, size.y, Color.white);
+                img.enabled = true;
+            }
+            else
+            {
+                img.color = new Color(0.55f, 0.30f, 0.92f, 0.75f);
+            }
+        }
+
+        private static Image GetOrAddImage(GameObject go)
+        {
+            if (go == null) return null;
+            Image img = go.GetComponent<Image>();
+            return img != null ? img : go.AddComponent<Image>();
+        }
+
+        private static void ConfigureGroupContainer(Transform groupTr, Vector2 anchoredPos, Vector2 size)
+        {
+            if (groupTr == null) return;
+
+            RectTransform rt = groupTr.GetComponent<RectTransform>();
+            if (rt != null)
+            {
+                rt.anchorMin = new Vector2(0f, 0.5f);
+                rt.anchorMax = new Vector2(0f, 0.5f);
+                rt.pivot = new Vector2(0f, 0.5f);
+                rt.anchoredPosition = anchoredPos;
+                rt.sizeDelta = size;
+            }
+
+            if (groupTr.TryGetComponent(out Image bg))
+            {
+                bg.sprite = null;
+                bg.color = Color.clear;
+                bg.raycastTarget = false;
+            }
+        }
+
+        private static void ConfigureToggleLayout(Button btn, Vector2 anchoredPos)
+        {
+            if (btn == null) return;
+            RectTransform rt = btn.GetComponent<RectTransform>();
+            if (rt != null)
+            {
+                rt.anchorMin = new Vector2(0.5f, 0.5f);
+                rt.anchorMax = new Vector2(0.5f, 0.5f);
+                rt.pivot = new Vector2(0.5f, 0.5f);
+                rt.anchoredPosition = anchoredPos;
+                rt.sizeDelta = new Vector2(164f, 36f);
+            }
+        }
+
+        private void StyleToggleButton(Button btn, TMP_Text lbl, string labelText, bool isOn)
+        {
+            if (btn != null)
+            {
+                Image btnImg = btn.image != null ? btn.image : btn.GetComponent<Image>();
+                if (btnImg != null)
+                {
+                    Sprite targetSp = isOn
+                        ? (toggleOnSprite != null ? toggleOnSprite : GlassHudTheme.LoadSprite("09_TrainingSpawnerDock/Toggle_Training_OptionPill_BlueLED_Clean.png"))
+                        : (toggleOffSprite != null ? toggleOffSprite : GlassHudTheme.LoadSprite("09_TrainingSpawnerDock/Toggle_Training_OptionPill_Blank.png"));
+
+                    if (targetSp != null)
+                    {
+                        GlassHudTheme.ApplySlicedSprite(btnImg, targetSp, 164f, 36f, Color.white);
+                    }
+                    else
+                    {
+                        GlassHudTheme.ApplySprite(btnImg, isOn ? "TogglePill_On_Green.png" : "TogglePill_Off_DarkGlass.png", default, true, false);
+                        btnImg.color = btnImg.sprite != null
+                            ? Color.white
+                            : (isOn ? new Color(0.16f, 0.60f, 0.34f, 0.96f) : new Color(0.14f, 0.18f, 0.25f, 0.95f));
+                    }
+                    btn.targetGraphic = btnImg;
+                }
+
+                Transform existingOrb = btn.transform.Find("LedOrb");
+                GameObject orbObj = existingOrb != null
+                    ? existingOrb.gameObject
+                    : new GameObject("LedOrb", typeof(RectTransform), typeof(Image));
+                if (existingOrb == null)
+                {
+                    orbObj.transform.SetParent(btn.transform, false);
+                }
+
+                RectTransform orbRt = orbObj.GetComponent<RectTransform>();
+                orbRt.anchorMin = new Vector2(0f, 0.5f);
+                orbRt.anchorMax = new Vector2(0f, 0.5f);
+                orbRt.pivot = new Vector2(0.5f, 0.5f);
+                orbRt.anchoredPosition = new Vector2(14f, 0f);
+                orbRt.sizeDelta = new Vector2(20f, 20f);
+
+                Image orbImg = GetOrAddImage(orbObj);
+                orbImg.raycastTarget = false;
+                if (isOn)
+                {
+                    // Toggle_Training_OptionPill_BlueLED_Clean already contains the lit orb in its L=130 bezel
+                    orbImg.enabled = false;
+                }
+                else
+                {
+                    Sprite orbSp = blueLedOrbSprite != null
+                        ? blueLedOrbSprite
+                        : GlassHudTheme.LoadSprite("09_TrainingSpawnerDock/Icon_Training_BlueLEDOrb.png");
+                    if (orbSp != null)
+                    {
+                        GlassHudTheme.ApplySlicedSprite(orbImg, orbSp, 20f, 20f, new Color(0.45f, 0.52f, 0.62f, 0.45f));
+                        orbImg.enabled = true;
+                    }
+                    else
+                    {
+                        orbImg.enabled = false;
+                    }
+                }
+            }
+
+            if (lbl != null)
+            {
+                lbl.text = labelText;
+                lbl.transform.SetAsLastSibling();
+                RectTransform lblRt = lbl.GetComponent<RectTransform>();
+                if (lblRt != null)
+                {
+                    lblRt.anchorMin = Vector2.zero;
+                    lblRt.anchorMax = Vector2.one;
+                    lblRt.pivot = new Vector2(0.5f, 0.5f);
+                    lblRt.offsetMin = new Vector2(26f, 0f);
+                    lblRt.offsetMax = new Vector2(-6f, 0f);
+                }
+
+                lbl.alignment = TextAlignmentOptions.MidlineLeft;
+                lbl.textWrappingMode = TextWrappingModes.NoWrap;
+                lbl.overflowMode = TextOverflowModes.Ellipsis;
+                lbl.raycastTarget = false;
+
+                Color textColor = isOn ? ToggleOnTextColor : ToggleOffTextColor;
+                GlassHudTheme.StyleTmpText(lbl, 11.5f, textColor, true, true);
+                lbl.enableAutoSizing = true;
+                lbl.fontSizeMin = 9.5f;
+                lbl.fontSizeMax = 11.5f;
+            }
+        }
+
+        private void StyleClearAllButton()
+        {
+            if (clearAllButton == null) return;
+
+            RectTransform clearRt = clearAllButton.GetComponent<RectTransform>();
+            if (clearRt != null)
+            {
+                clearRt.anchorMin = new Vector2(1f, 0.5f);
+                clearRt.anchorMax = new Vector2(1f, 0.5f);
+                clearRt.pivot = new Vector2(0.5f, 0.5f);
+                clearRt.anchoredPosition = new Vector2(-39f, 0f);
+                clearRt.sizeDelta = new Vector2(76f, 76f);
+            }
+
+            Image clearImg = clearAllButton.image != null
+                ? clearAllButton.image
+                : GetOrAddImage(clearAllButton.gameObject);
+            Sprite clearSp = clearAllSprite != null
+                ? clearAllSprite
+                : GlassHudTheme.LoadSprite("09_TrainingSpawnerDock/Btn_Training_ClearAll_RedRing_Clean.png");
+            if (clearSp != null)
+            {
+                GlassHudTheme.ApplySlicedSprite(clearImg, clearSp, 76f, 76f, Color.white);
+            }
+            else
+            {
+                GlassHudTheme.ApplySprite(clearImg, "PillBtn_RedDanger.png", default, true, false);
+                clearImg.color = clearImg.sprite != null
+                    ? Color.white
+                    : new Color(0.72f, 0.16f, 0.20f, 0.96f);
+            }
+            clearAllButton.targetGraphic = clearImg;
+
+            Transform trashTr = clearAllButton.transform.Find("TrashIcon");
+            GameObject trashObj;
+            if (trashTr != null)
+            {
+                trashObj = trashTr.gameObject;
+            }
+            else
+            {
+                trashObj = new GameObject("TrashIcon", typeof(RectTransform), typeof(Image));
+                trashObj.transform.SetParent(clearAllButton.transform, false);
+            }
+
+            RectTransform trashRt = trashObj.GetComponent<RectTransform>();
+            trashRt.anchorMin = new Vector2(0.5f, 1f);
+            trashRt.anchorMax = new Vector2(0.5f, 1f);
+            trashRt.pivot = new Vector2(0.5f, 1f);
+            trashRt.anchoredPosition = new Vector2(0f, -14f);
+            trashRt.sizeDelta = new Vector2(18f, 18f);
+
+            Image trashImg = GetOrAddImage(trashObj);
+            Sprite trashSp = clearTrashIconSprite != null
+                ? clearTrashIconSprite
+                : GlassHudTheme.LoadSprite("Icon_Trash_Red.png");
+            if (trashSp != null)
+            {
+                GlassHudTheme.ApplySprite(trashImg, trashSp, false, true);
+            }
+            else
+            {
+                GlassHudTheme.ApplySprite(trashImg, "Icon_Trash_Red.png", default, false, true);
+            }
+            trashImg.color = Color.white;
+            trashImg.preserveAspect = true;
+            trashImg.raycastTarget = false;
+            trashImg.enabled = trashImg.sprite != null;
+
+            Transform lblTr = clearAllButton.transform.Find("Label");
+            TMP_Text clearLbl = lblTr != null
+                ? lblTr.GetComponent<TMP_Text>()
+                : clearAllButton.GetComponentInChildren<TMP_Text>(true);
+
+            if (clearLbl == null)
+            {
+                TMP_FontAsset sharedFont = FindCanvasTmpFont(clearAllButton.GetComponentInParent<Canvas>());
+                GameObject lblObj = CreateTmpTextObj("Label", clearAllButton.transform, "XÓA\nQUÁI", 10f, Color.white, sharedFont);
+                clearLbl = lblObj.GetComponent<TMP_Text>();
+            }
+
+            RectTransform lblRt = clearLbl.GetComponent<RectTransform>();
+            if (lblRt != null)
+            {
+                lblRt.anchorMin = Vector2.zero;
+                lblRt.anchorMax = Vector2.one;
+                lblRt.pivot = new Vector2(0.5f, 0.5f);
+                lblRt.offsetMin = new Vector2(10f, 10f);
+                lblRt.offsetMax = new Vector2(-10f, -32f);
+            }
+
+            clearLbl.text = "XÓA\nQUÁI";
+            clearLbl.alignment = TextAlignmentOptions.Center;
+            clearLbl.textWrappingMode = TextWrappingModes.NoWrap;
+            clearLbl.raycastTarget = false;
+            GlassHudTheme.StyleTmpText(clearLbl, 10f, Color.white, true, true);
+            clearLbl.enableAutoSizing = true;
+            clearLbl.fontSizeMin = 8f;
+            clearLbl.fontSizeMax = 10.5f;
+        }
+
+        private Button EnsureCarouselArrowButton(
+            Transform parent,
+            Button existing,
+            string objName,
+            string symbol,
+            Vector2 anchoredPos,
+            TMP_FontAsset fallbackFont)
+        {
+            if (parent == null) return existing;
+
+            Button btn = existing;
+            if (btn == null)
+            {
+                Transform existingTr = parent.Find(objName);
+                if (existingTr != null)
+                {
+                    btn = existingTr.GetComponent<Button>();
+                }
+            }
+
+            GameObject btnObj;
+            if (btn == null)
+            {
+                btnObj = new GameObject(objName, typeof(RectTransform), typeof(Image), typeof(Button));
+                btnObj.transform.SetParent(parent, false);
+                btn = btnObj.GetComponent<Button>();
+            }
+            else
+            {
+                btnObj = btn.gameObject;
+                if (btnObj.transform.parent != parent)
+                {
+                    btnObj.transform.SetParent(parent, false);
+                }
+            }
+
+            RectTransform rt = btnObj.GetComponent<RectTransform>();
+            rt.anchorMin = new Vector2(0f, 0.5f);
+            rt.anchorMax = new Vector2(0f, 0.5f);
+            rt.pivot = new Vector2(0.5f, 0.5f);
+            rt.anchoredPosition = anchoredPos;
+            rt.sizeDelta = new Vector2(26f, 70f);
+
+            Image bg = GetOrAddImage(btnObj);
+            Sprite arrowSp = arrowButtonSprite != null
+                ? arrowButtonSprite
+                : GlassHudTheme.LoadSprite("Keycap_Badge_Dark.png");
+            if (arrowSp != null)
+            {
+                GlassHudTheme.ApplySlicedSprite(bg, arrowSp, 26f, 70f, Color.white);
+            }
+            else
+            {
+                bg.color = new Color(0.11f, 0.16f, 0.24f, 0.94f);
+            }
+            bg.raycastTarget = true;
+            btn.targetGraphic = bg;
+
+            Transform lblTr = btnObj.transform.Find("Label");
+            TMP_Text lbl = lblTr != null
+                ? lblTr.GetComponent<TMP_Text>()
+                : btnObj.GetComponentInChildren<TMP_Text>(true);
+            if (lbl == null)
+            {
+                GameObject lblObj = CreateTmpTextObj("Label", btnObj.transform, symbol, 16f, ArrowKeycapTextColor, fallbackFont);
+                lbl = lblObj.GetComponent<TMP_Text>();
+            }
+
+            RectTransform lblRt = lbl.GetComponent<RectTransform>();
+            if (lblRt != null)
+            {
+                lblRt.anchorMin = Vector2.zero;
+                lblRt.anchorMax = Vector2.one;
+                lblRt.pivot = new Vector2(0.5f, 0.5f);
+                lblRt.offsetMin = Vector2.zero;
+                lblRt.offsetMax = Vector2.zero;
+            }
+
+            if (lbl.font == null && fallbackFont != null)
+            {
+                lbl.font = fallbackFont;
+            }
+            lbl.text = symbol;
+            lbl.alignment = TextAlignmentOptions.Center;
+            lbl.raycastTarget = false;
+            GlassHudTheme.StyleTmpText(lbl, 16f, ArrowKeycapTextColor, true, true);
+
+            return btn;
+        }
+
+        private void WireCarouselArrowButtons()
+        {
+            if (scrollLeftButton != null)
+            {
+                scrollLeftButton.onClick.RemoveAllListeners();
+                scrollLeftButton.onClick.AddListener(() => NudgeSpawnCarousel(-SpawnScrollStepNormalized));
+            }
+            if (scrollRightButton != null)
+            {
+                scrollRightButton.onClick.RemoveAllListeners();
+                scrollRightButton.onClick.AddListener(() => NudgeSpawnCarousel(SpawnScrollStepNormalized));
+            }
+        }
+
+        private void NudgeSpawnCarousel(float normalizedDelta)
+        {
+            if (trainingPanel == null) return;
+            ScrollRect sr = trainingPanel.GetComponentInChildren<ScrollRect>(true);
+            if (sr == null) return;
+
+            float basePos = spawnScrollLerpCoroutine != null
+                ? spawnScrollTargetNormalized
+                : sr.horizontalNormalizedPosition;
+
+            spawnScrollTargetNormalized = Mathf.Clamp01(basePos + normalizedDelta);
+
+            if (spawnScrollLerpCoroutine != null)
+            {
+                StopCoroutine(spawnScrollLerpCoroutine);
+                spawnScrollLerpCoroutine = null;
+            }
+
+            if (!gameObject.activeInHierarchy || !sr.gameObject.activeInHierarchy)
+            {
+                sr.horizontalNormalizedPosition = spawnScrollTargetNormalized;
+                return;
+            }
+
+            spawnScrollLerpCoroutine = StartCoroutine(SmoothLerpSpawnScrollCoroutine(sr, spawnScrollTargetNormalized));
+        }
+
+        private IEnumerator SmoothLerpSpawnScrollCoroutine(ScrollRect sr, float targetNormalized)
+        {
+            float startNormalized = sr.horizontalNormalizedPosition;
+            float elapsed = 0f;
+            sr.StopMovement();
+
+            while (elapsed < SpawnScrollLerpDuration)
+            {
+                if (sr == null)
+                {
+                    spawnScrollLerpCoroutine = null;
+                    yield break;
+                }
+
+                elapsed += Time.unscaledDeltaTime;
+                float t = Mathf.Clamp01(elapsed / SpawnScrollLerpDuration);
+                float eased = Mathf.SmoothStep(0f, 1f, t);
+                sr.velocity = Vector2.zero;
+                sr.horizontalNormalizedPosition = Mathf.Lerp(startNormalized, targetNormalized, eased);
+                yield return null;
+            }
+
+            if (sr != null)
+            {
+                sr.velocity = Vector2.zero;
+                sr.horizontalNormalizedPosition = targetNormalized;
+            }
+            spawnScrollLerpCoroutine = null;
+        }
+
+        private void StyleAllSpawnCards(ScrollRect sr)
+        {
+            Transform contentTr = sr != null ? sr.content : null;
+            if (contentTr != null)
+            {
+                for (int i = 0; i < contentTr.childCount; i++)
+                {
+                    Transform child = contentTr.GetChild(i);
+                    if (child != null && child.TryGetComponent(out Button childBtn))
+                    {
+                        StyleSpawnCardButton(childBtn);
+                    }
+                }
+            }
+
+            if (spawnButtons != null)
+            {
+                for (int i = 0; i < spawnButtons.Length; i++)
+                {
+                    Button btn = spawnButtons[i];
+                    if (btn == null) continue;
+                    if (contentTr != null && btn.transform.parent == contentTr) continue;
+                    StyleSpawnCardButton(btn);
+                }
+            }
+        }
+
+        private void StyleSpawnCardButton(Button btn)
+        {
+            if (btn == null) return;
+
+            RectTransform btnRt = btn.GetComponent<RectTransform>();
+            if (btnRt != null)
+            {
+                btnRt.pivot = new Vector2(0.5f, 0.5f);
+                btnRt.sizeDelta = new Vector2(64f, 74f);
+            }
+
+            LayoutElement le;
+            if (!btn.TryGetComponent(out le))
+            {
+                le = btn.gameObject.AddComponent<LayoutElement>();
+            }
+            le.minWidth = 64f;
+            le.preferredWidth = 64f;
+            le.minHeight = 74f;
+            le.preferredHeight = 74f;
+            le.flexibleWidth = 0f;
+
+            Image bg = btn.image != null ? btn.image : GetOrAddImage(btn.gameObject);
+            Sprite cardSp = spawnCardSprite != null
+                ? spawnCardSprite
+                : GlassHudTheme.LoadSprite("09_TrainingSpawnerDock/Slot_Training_EnemySpawnCard_Clean.png");
+            if (cardSp != null)
+            {
+                GlassHudTheme.ApplySlicedSprite(bg, cardSp, 64f, 74f, Color.white);
+            }
+            else
+            {
+                GlassHudTheme.ApplySprite(bg, "MiniGlassCard_SpawnSlot.png", default, true, false);
+                bg.color = bg.sprite != null
+                    ? Color.white
+                    : new Color(0.14f, 0.20f, 0.30f, 0.94f);
+            }
+            btn.targetGraphic = bg;
+
+            Transform iconTr = btn.transform.Find("Icon");
+            if (iconTr != null && iconTr.TryGetComponent(out Image iconImg))
+            {
+                RectTransform iconRt = iconTr.GetComponent<RectTransform>();
+                if (iconRt != null)
+                {
+                    iconRt.anchorMin = Vector2.zero;
+                    iconRt.anchorMax = Vector2.one;
+                    iconRt.pivot = new Vector2(0.5f, 0.5f);
+                    iconRt.offsetMin = new Vector2(7f, 20f);
+                    iconRt.offsetMax = new Vector2(-7f, -6f);
+                }
+                iconImg.preserveAspect = true;
+                iconImg.raycastTarget = false;
+                iconImg.color = Color.white;
+            }
+
+            Transform lblTr = btn.transform.Find("Label");
+            TMP_Text lblTmp = lblTr != null
+                ? lblTr.GetComponent<TMP_Text>()
+                : btn.GetComponentInChildren<TMP_Text>(true);
+            if (lblTmp != null)
+            {
+                RectTransform lblRt = lblTmp.GetComponent<RectTransform>();
+                if (lblRt != null)
+                {
+                    lblRt.anchorMin = new Vector2(0f, 0f);
+                    lblRt.anchorMax = new Vector2(1f, 0f);
+                    lblRt.pivot = new Vector2(0.5f, 0f);
+                    lblRt.anchoredPosition = new Vector2(0f, 3f);
+                    lblRt.sizeDelta = new Vector2(-10f, 15f);
+                }
+                lblTmp.alignment = TextAlignmentOptions.Center;
+                lblTmp.textWrappingMode = TextWrappingModes.NoWrap;
+                lblTmp.overflowMode = TextOverflowModes.Ellipsis;
+                lblTmp.raycastTarget = false;
+                GlassHudTheme.StyleTmpText(lblTmp, 9.5f, SpawnCardTextColor, true, true);
+                lblTmp.enableAutoSizing = true;
+                lblTmp.fontSizeMin = 7.5f;
+                lblTmp.fontSizeMax = 10f;
+            }
+        }
+
         private void EnsureTrainingPanelExists()
+        {
+            if (trainingPanel != null) return;
+            BuildRuntimeTopBarFallback();
+        }
+
+        private void BuildRuntimeTopBarFallback()
         {
             if (trainingPanel != null) return;
 
@@ -971,9 +1935,9 @@ namespace StickmanBeatEmUp.GameModes
             if (bossPanelTr != null)
             {
                 RectTransform bossRt = bossPanelTr.GetComponent<RectTransform>();
-                if (bossRt != null && bossRt.anchoredPosition.y > -110f)
+                if (bossRt != null && bossRt.anchoredPosition.y > -114f)
                 {
-                    bossRt.anchoredPosition = new Vector2(bossRt.anchoredPosition.x, -112f);
+                    bossRt.anchoredPosition = new Vector2(bossRt.anchoredPosition.x, -114f);
                 }
             }
 
@@ -981,56 +1945,87 @@ namespace StickmanBeatEmUp.GameModes
 
             trainingPanel = new GameObject("TrainingTopBar", typeof(RectTransform), typeof(Image));
             trainingPanel.transform.SetParent(canvas.transform, false);
+
+            int modalSiblingIdx = canvas.transform.childCount;
+            string[] modalNames = { "VictoryPanel", "DefeatPanel", "PauseModalPanel" };
+            for (int m = 0; m < modalNames.Length; m++)
+            {
+                Transform modalTr = canvas.transform.Find(modalNames[m]);
+                if (modalTr != null) modalSiblingIdx = Mathf.Min(modalSiblingIdx, modalTr.GetSiblingIndex());
+            }
+            if (modalSiblingIdx < canvas.transform.childCount)
+            {
+                trainingPanel.transform.SetSiblingIndex(modalSiblingIdx);
+            }
             RectTransform panelRt = trainingPanel.GetComponent<RectTransform>();
             panelRt.anchorMin = new Vector2(0.5f, 1f);
             panelRt.anchorMax = new Vector2(0.5f, 1f);
             panelRt.pivot = new Vector2(0.5f, 1f);
-            panelRt.anchoredPosition = new Vector2(34f, -6f);
-            panelRt.sizeDelta = new Vector2(1016f, 88f);
-            trainingPanel.GetComponent<Image>().color = new Color(0.06f, 0.09f, 0.15f, 0.92f);
+            panelRt.anchoredPosition = new Vector2(-12f, -8f);
+            panelRt.sizeDelta = new Vector2(968f, 98f);
+            Image panelImg = trainingPanel.GetComponent<Image>();
+            panelImg.color = Color.white;
 
             // Group 1: Player Controls
-            GameObject group1 = CreateUiContainer("Group1_PlayerControls", trainingPanel.transform, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(8f, 0f), new Vector2(184f, 76f), new Color(0.11f, 0.15f, 0.22f, 0.92f));
-            playerInvincibleButton = CreateActionButton("PlayerInvincibleButton", group1.transform, "BẤT TỬ PLAYER: TẮT", new Vector2(0f, 18f), new Vector2(172f, 32f), new Color(0.28f, 0.31f, 0.37f, 0.95f), 11f, sharedFont, out playerInvincibleLabel);
+            GameObject group1 = CreateUiContainer("Group1_PlayerControls", trainingPanel.transform, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(14f, 0f), new Vector2(164f, 78f), Color.clear);
+            playerInvincibleButton = CreateActionButton("PlayerInvincibleButton", group1.transform, "BẤT TỬ: TẮT", new Vector2(0f, 20f), new Vector2(164f, 36f), Color.white, 11.5f, sharedFont, out playerInvincibleLabel);
             autoHpButton = playerInvincibleButton;
             autoHpLabel = playerInvincibleLabel;
-            autoRageButton = CreateActionButton("AutoMaxRageButton", group1.transform, "MAX NỘ: BẬT", new Vector2(0f, -18f), new Vector2(172f, 32f), new Color(0.82f, 0.46f, 0.10f, 0.96f), 11f, sharedFont, out autoRageLabel);
+            autoRageButton = CreateActionButton("AutoMaxRageButton", group1.transform, "MAX NỘ: BẬT", new Vector2(0f, -20f), new Vector2(164f, 36f), Color.white, 11.5f, sharedFont, out autoRageLabel);
 
             // Group 2: Enemy Controls
-            GameObject group2 = CreateUiContainer("Group2_EnemyControls", trainingPanel.transform, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(200f, 0f), new Vector2(176f, 76f), new Color(0.11f, 0.15f, 0.22f, 0.92f));
-            enemyAiButton = CreateActionButton("EnemyAiButton", group2.transform, "AI QUÁI: BẬT", new Vector2(0f, 18f), new Vector2(164f, 32f), new Color(0.16f, 0.58f, 0.34f, 0.96f), 11f, sharedFont, out enemyAiLabel);
-            enemyInvincibleButton = CreateActionButton("EnemyInvincibleButton", group2.transform, "BẤT TỬ QUÁI: TẮT", new Vector2(0f, -18f), new Vector2(164f, 32f), new Color(0.28f, 0.31f, 0.37f, 0.95f), 11f, sharedFont, out enemyInvincibleLabel);
+            GameObject group2 = CreateUiContainer("Group2_EnemyControls", trainingPanel.transform, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(182f, 0f), new Vector2(164f, 78f), Color.clear);
+            enemyAiButton = CreateActionButton("EnemyAiButton", group2.transform, "AI QUÁI: BẬT", new Vector2(0f, 20f), new Vector2(164f, 36f), Color.white, 11.5f, sharedFont, out enemyAiLabel);
+            enemyInvincibleButton = CreateActionButton("EnemyInvincibleButton", group2.transform, "QUÁI BẤT TỬ: TẮT", new Vector2(0f, -20f), new Vector2(164f, 36f), Color.white, 11.5f, sharedFont, out enemyInvincibleLabel);
 
-            // Group 3: Spawn Icon Bar + Clear
-            GameObject group3 = CreateUiContainer("Group3_SpawnAndClear", trainingPanel.transform, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(384f, 0f), new Vector2(624f, 76f), new Color(0.09f, 0.12f, 0.19f, 0.90f));
+            // Group 3: Spawn Carousel (< / Scroll / >) + Clear
+            GameObject group3 = CreateUiContainer("Group3_SpawnAndClear", trainingPanel.transform, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(368f, 0f), new Vector2(588f, 80f), Color.clear);
 
-            GameObject scrollObj = CreateUiContainer("SpawnListScroll", group3.transform, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(4f, 0f), new Vector2(504f, 70f), new Color(0.05f, 0.07f, 0.12f, 0.85f));
+            scrollLeftButton = EnsureCarouselArrowButton(group3.transform, null, "ScrollLeftButton", "<", new Vector2(13f, 0f), sharedFont);
+
+            GameObject scrollObj = CreateUiContainer("SpawnListScroll", group3.transform, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(29f, 0f), new Vector2(432f, 78f), new Color(0f, 0f, 0f, 0.01f));
+            scrollObj.GetComponent<Image>().raycastTarget = true;
             ScrollRect sr = scrollObj.AddComponent<ScrollRect>();
             sr.horizontal = true;
             sr.vertical = false;
+            sr.movementType = ScrollRect.MovementType.Elastic;
+            sr.elasticity = 0.08f;
+            sr.inertia = true;
+            sr.decelerationRate = 0.135f;
             sr.scrollSensitivity = 28f;
-            sr.movementType = ScrollRect.MovementType.Clamped;
 
-            GameObject viewportObj = new GameObject("Viewport", typeof(RectTransform), typeof(RectMask2D));
+            GameObject viewportObj = new GameObject("Viewport", typeof(RectTransform), typeof(Image), typeof(RectMask2D));
             viewportObj.transform.SetParent(scrollObj.transform, false);
             RectTransform vpRt = viewportObj.GetComponent<RectTransform>();
             vpRt.anchorMin = Vector2.zero;
             vpRt.anchorMax = Vector2.one;
-            vpRt.offsetMin = new Vector2(4f, 3f);
-            vpRt.offsetMax = new Vector2(-4f, -3f);
+            vpRt.offsetMin = new Vector2(2f, 1f);
+            vpRt.offsetMax = new Vector2(-2f, -1f);
+            Image vpImg = viewportObj.GetComponent<Image>();
+            vpImg.color = new Color(0f, 0f, 0f, 0.01f);
+            vpImg.raycastTarget = true;
             sr.viewport = vpRt;
 
             int count = unitRoster != null && unitRoster.Length > 0 ? unitRoster.Length : 12;
-            const float tileWidth = 64f;
-            const float tileStep = 68f;
-            GameObject contentObj = new GameObject("Content", typeof(RectTransform));
+            GameObject contentObj = new GameObject("Content", typeof(RectTransform), typeof(HorizontalLayoutGroup), typeof(ContentSizeFitter));
             contentObj.transform.SetParent(viewportObj.transform, false);
             RectTransform contentRt = contentObj.GetComponent<RectTransform>();
             contentRt.anchorMin = new Vector2(0f, 0f);
             contentRt.anchorMax = new Vector2(0f, 1f);
             contentRt.pivot = new Vector2(0f, 0.5f);
             contentRt.anchoredPosition = Vector2.zero;
-            contentRt.sizeDelta = new Vector2(count * tileStep + 4f, 0f);
+            contentRt.sizeDelta = Vector2.zero;
+            HorizontalLayoutGroup hlg = contentObj.GetComponent<HorizontalLayoutGroup>();
+            hlg.padding = new RectOffset(4, 6, 2, 2);
+            hlg.spacing = 6f;
+            hlg.childAlignment = TextAnchor.MiddleLeft;
+            hlg.childControlWidth = true;
+            hlg.childControlHeight = true;
+            hlg.childForceExpandWidth = false;
+            hlg.childForceExpandHeight = false;
+            ContentSizeFitter csf = contentObj.GetComponent<ContentSizeFitter>();
+            csf.horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
+            csf.verticalFit = ContentSizeFitter.FitMode.Unconstrained;
             sr.content = contentRt;
 
             spawnButtons = new Button[count];
@@ -1052,8 +2047,7 @@ namespace StickmanBeatEmUp.GameModes
                 Button btn = CreateScrollSpawnIconButton(
                     $"SpawnUnit_{i}",
                     contentObj.transform,
-                    4f + i * tileStep,
-                    tileWidth,
+                    sr,
                     labelText,
                     iconSprite,
                     sharedFont,
@@ -1064,23 +2058,32 @@ namespace StickmanBeatEmUp.GameModes
                 spawnIcons[i] = btnIcon;
             }
 
-            clearAllButton = CreateActionButton("ClearAllEnemiesButton", group3.transform, "XÓA SẠCH\nQUÁI", new Vector2(-58f, 0f), new Vector2(108f, 68f), new Color(0.72f, 0.16f, 0.20f, 0.96f), 12f, sharedFont, out _);
+            scrollRightButton = EnsureCarouselArrowButton(group3.transform, null, "ScrollRightButton", ">", new Vector2(478f, 0f), sharedFont);
+
+            LayoutRebuilder.ForceRebuildLayoutImmediate(contentRt);
+            sr.horizontalNormalizedPosition = 0f;
+
+            clearAllButton = CreateActionButton("ClearAllEnemiesButton", group3.transform, "XÓA\nQUÁI", new Vector2(-39f, 0f), new Vector2(76f, 76f), Color.white, 10f, sharedFont, out _);
             RectTransform clearRt = clearAllButton.GetComponent<RectTransform>();
             clearRt.anchorMin = new Vector2(1f, 0.5f);
             clearRt.anchorMax = new Vector2(1f, 0.5f);
-            clearRt.pivot = new Vector2(1f, 0.5f);
-            clearRt.anchoredPosition = new Vector2(-4f, 0f);
+            clearRt.pivot = new Vector2(0.5f, 0.5f);
+            clearRt.anchoredPosition = new Vector2(-39f, 0f);
+
+            ApplySleekGlassTrainingTheme();
         }
 
         private static TMP_FontAsset FindCanvasTmpFont(Canvas canvas)
         {
-            if (canvas == null) return null;
-            TextMeshProUGUI[] texts = canvas.GetComponentsInChildren<TextMeshProUGUI>(true);
-            for (int i = 0; i < texts.Length; i++)
+            if (canvas != null)
             {
-                if (texts[i] != null && texts[i].font != null) return texts[i].font;
+                TextMeshProUGUI[] texts = canvas.GetComponentsInChildren<TextMeshProUGUI>(true);
+                for (int i = 0; i < texts.Length; i++)
+                {
+                    if (texts[i] != null && texts[i].font != null) return texts[i].font;
+                }
             }
-            return null;
+            return GlassHudTheme.ResolveSharedTmpFont(canvas != null ? canvas.transform : null);
         }
 
         private static GameObject CreateUiContainer(string name, Transform parent, Vector2 anchorMin, Vector2 anchorMax, Vector2 pivot, Vector2 pos, Vector2 size, Color bgColor)
@@ -1093,7 +2096,9 @@ namespace StickmanBeatEmUp.GameModes
             rt.pivot = pivot;
             rt.anchoredPosition = pos;
             rt.sizeDelta = size;
-            go.GetComponent<Image>().color = bgColor;
+            Image img = go.GetComponent<Image>();
+            img.color = bgColor;
+            img.raycastTarget = bgColor.a > 0f;
             return go;
         }
 
@@ -1148,48 +2153,55 @@ namespace StickmanBeatEmUp.GameModes
         private static Button CreateScrollSpawnIconButton(
             string name,
             Transform parent,
-            float xPos,
-            float width,
+            ScrollRect scrollRect,
             string text,
             Sprite iconSprite,
             TMP_FontAsset font,
             out TMP_Text labelOut,
             out Image iconOut)
         {
-            GameObject btnObj = new GameObject(name, typeof(RectTransform), typeof(Image), typeof(Button));
+            GameObject btnObj = new GameObject(name, typeof(RectTransform), typeof(LayoutElement), typeof(Image), typeof(Button), typeof(ScrollEventForwarder));
             btnObj.transform.SetParent(parent, false);
             RectTransform rt = btnObj.GetComponent<RectTransform>();
             rt.anchorMin = new Vector2(0f, 0.5f);
             rt.anchorMax = new Vector2(0f, 0.5f);
             rt.pivot = new Vector2(0f, 0.5f);
-            rt.anchoredPosition = new Vector2(xPos, 0f);
-            rt.sizeDelta = new Vector2(width, 60f);
+            rt.anchoredPosition = Vector2.zero;
+            rt.sizeDelta = new Vector2(64f, 74f);
+
+            LayoutElement le = btnObj.GetComponent<LayoutElement>();
+            le.minWidth = 64f;
+            le.preferredWidth = 64f;
+            le.minHeight = 74f;
+            le.preferredHeight = 74f;
+            le.flexibleWidth = 0f;
 
             Image bg = btnObj.GetComponent<Image>();
-            bg.color = new Color(0.18f, 0.25f, 0.38f, 0.96f);
+            bg.color = Color.white;
             Button btn = btnObj.GetComponent<Button>();
             btn.targetGraphic = bg;
+            btnObj.GetComponent<ScrollEventForwarder>().Initialize(scrollRect);
 
             GameObject iconObj = new GameObject("Icon", typeof(RectTransform), typeof(Image));
             iconObj.transform.SetParent(btnObj.transform, false);
             RectTransform iconRt = iconObj.GetComponent<RectTransform>();
             iconRt.anchorMin = Vector2.zero;
             iconRt.anchorMax = Vector2.one;
-            iconRt.offsetMin = new Vector2(6f, 18f);
-            iconRt.offsetMax = new Vector2(-6f, -3f);
+            iconRt.offsetMin = new Vector2(7f, 20f);
+            iconRt.offsetMax = new Vector2(-7f, -6f);
             iconOut = iconObj.GetComponent<Image>();
             iconOut.sprite = iconSprite;
             iconOut.preserveAspect = true;
             iconOut.raycastTarget = false;
             iconOut.enabled = iconSprite != null;
 
-            GameObject txtObj = CreateTmpTextObj("Label", btnObj.transform, text, 9.5f, Color.white, font);
+            GameObject txtObj = CreateTmpTextObj("Label", btnObj.transform, text, 9.5f, SpawnCardTextColor, font);
             RectTransform txtRt = txtObj.GetComponent<RectTransform>();
             txtRt.anchorMin = new Vector2(0f, 0f);
             txtRt.anchorMax = new Vector2(1f, 0f);
             txtRt.pivot = new Vector2(0.5f, 0f);
-            txtRt.anchoredPosition = new Vector2(0f, 2f);
-            txtRt.sizeDelta = new Vector2(-4f, 16f);
+            txtRt.anchoredPosition = new Vector2(0f, 3f);
+            txtRt.sizeDelta = new Vector2(-10f, 15f);
             TextMeshProUGUI tmp = txtObj.GetComponent<TextMeshProUGUI>();
             tmp.textWrappingMode = TextWrappingModes.NoWrap;
             tmp.overflowMode = TextOverflowModes.Ellipsis;

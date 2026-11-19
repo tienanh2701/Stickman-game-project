@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.IO;
 using UnityEngine;
 #if ENABLE_INPUT_SYSTEM
 using UnityEngine.InputSystem;
@@ -8,6 +9,8 @@ using StickmanBeatEmUp.Core;
 using StickmanBeatEmUp.Characters.Stats;
 using StickmanBeatEmUp.GameModes;
 using StickmanBeatEmUp.Level;
+using StickmanBeatEmUp.UI;
+using StickmanGame.VFX;
 
 namespace StickmanBeatEmUp.Characters
 {
@@ -58,6 +61,10 @@ namespace StickmanBeatEmUp.Characters
         [SerializeField] protected float blockCooldown = 0f;
         [SerializeField] protected float blockDamageMultiplier = 0.2f;
 
+        [Header("Hurt & Stun Immunity")]
+        [SerializeField] protected float hurtDuration = 0.15f;
+        [SerializeField] protected float stunImmunityDuration = 0.4f;
+
         private static readonly int AnimStateHash = Animator.StringToHash("State");
         private static readonly int AnimTransformedHash = Animator.StringToHash("IsTransformed");
         private static readonly int AnimSkillIndexHash = Animator.StringToHash("SkillIndex");
@@ -83,7 +90,7 @@ namespace StickmanBeatEmUp.Characters
         protected float lastBlockTime = -10f;
         protected float blockTimer = 0f;
         private Coroutine blockFlashCoroutine;
-        private Color blockShieldBaseColor = Color.white;
+        private Color blockShieldBaseColor = new Color(0.85f, 0.98f, 1f, 0.72f);
 
         // Item Buffs & Environmental Hazard Modifiers
         protected float spinalFluidTimer = 0f;
@@ -107,6 +114,9 @@ namespace StickmanBeatEmUp.Characters
         private float timedTransformEndTime = -1f;
         private bool isTrainingRespawnInvulnerable = false;
         private bool isReflectingDamage = false;
+        private float stunImmunityUntilTime = -999f;
+
+        private static Sprite cachedBlockShieldSprite;
 
         // Properties công khai
         public Transform Transform => transform;
@@ -140,6 +150,12 @@ namespace StickmanBeatEmUp.Characters
         public event Action<bool> OnTransformedChanged;
         public event Action<AttackType, IDamageable> OnEnemyHit;
 
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetBaseCharacterStatics()
+        {
+            cachedBlockShieldSprite = null;
+        }
+
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
         public static void ConfigureLayerCollisions()
         {
@@ -163,6 +179,13 @@ namespace StickmanBeatEmUp.Characters
         {
             blockDuration = 0.75f;
             blockCooldown = 0f;
+            if (hurtDuration <= 0f) hurtDuration = 0.15f;
+            if (stats != null && stats.hurtDuration > 0f)
+            {
+                hurtDuration = Mathf.Min(hurtDuration, stats.hurtDuration);
+            }
+            hurtDuration = Mathf.Min(hurtDuration, 0.15f);
+            if (stunImmunityDuration < 0f) stunImmunityDuration = 0.4f;
             if (mapMaxY < 4.8f) mapMaxY = 4.8f;
 
             rb = GetComponent<Rigidbody2D>();
@@ -209,9 +232,105 @@ namespace StickmanBeatEmUp.Characters
 
             if (blockShieldVisual != null)
             {
-                blockShieldBaseColor = blockShieldVisual.color;
+                ConfigureBlockShieldVisual();
                 blockShieldVisual.gameObject.SetActive(false);
             }
+        }
+
+        private void ConfigureBlockShieldVisual()
+        {
+            if (blockShieldVisual == null) return;
+
+            if (blockShieldVisual.sprite == null || blockShieldVisual.sprite.bounds.size.x < 0.5f)
+            {
+                Sprite loaded = LoadBlockShieldSprite();
+                if (loaded != null)
+                {
+                    blockShieldVisual.sprite = loaded;
+                }
+            }
+
+            Vector3 center = (spriteRenderer != null && spriteRenderer.sprite != null)
+                ? spriteRenderer.sprite.bounds.center
+                : new Vector3(0f, 0.85f, 0f);
+            if (spriteRenderer != null && spriteRenderer.sprite != null && spriteRenderer.transform != transform)
+            {
+                center = transform.InverseTransformPoint(spriteRenderer.transform.TransformPoint(center));
+            }
+
+            blockShieldVisual.transform.localPosition = new Vector3(center.x, center.y, 0f);
+            blockShieldVisual.transform.localScale = new Vector3(1.7f, 1.7f, 1f);
+            blockShieldBaseColor = new Color(0.85f, 0.98f, 1f, 0.72f);
+            blockShieldVisual.color = blockShieldBaseColor;
+        }
+
+        private static Sprite LoadBlockShieldSprite()
+        {
+            if (cachedBlockShieldSprite != null) return cachedBlockShieldSprite;
+
+#if UNITY_EDITOR
+            Sprite editorSprite = UnityEditor.AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Combat/FX_BlockShield_Cyan.png");
+            if (editorSprite != null)
+            {
+                cachedBlockShieldSprite = editorSprite;
+                return cachedBlockShieldSprite;
+            }
+#endif
+
+            string[] diskCandidates =
+            {
+                Path.Combine(Application.dataPath, "Sprites/Combat/FX_BlockShield_Cyan.png"),
+                Path.Combine(Application.streamingAssetsPath, "Sprites/Combat/FX_BlockShield_Cyan.png")
+            };
+
+            for (int i = 0; i < diskCandidates.Length; i++)
+            {
+                if (!File.Exists(diskCandidates[i])) continue;
+                byte[] bytes = File.ReadAllBytes(diskCandidates[i]);
+                if (bytes == null || bytes.Length == 0) continue;
+
+                Texture2D tex = new Texture2D(2, 2, TextureFormat.RGBA32, false);
+                if (tex.LoadImage(bytes, false))
+                {
+                    tex.filterMode = FilterMode.Bilinear;
+                    tex.wrapMode = TextureWrapMode.Clamp;
+                    cachedBlockShieldSprite = Sprite.Create(tex, new Rect(0f, 0f, tex.width, tex.height), new Vector2(0.5f, 0.5f), 160f);
+                    cachedBlockShieldSprite.name = "FX_BlockShield_Cyan_Runtime";
+                    return cachedBlockShieldSprite;
+                }
+                Destroy(tex);
+            }
+
+            const int size = 128;
+            Texture2D fallbackTex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+            fallbackTex.filterMode = FilterMode.Bilinear;
+            fallbackTex.wrapMode = TextureWrapMode.Clamp;
+            Color[] pixels = new Color[size * size];
+            float half = (size - 1) * 0.5f;
+            for (int y = 0; y < size; y++)
+            {
+                for (int x = 0; x < size; x++)
+                {
+                    float dx = (x - half) / half;
+                    float dy = (y - half) / half;
+                    float dist = Mathf.Sqrt(dx * dx + dy * dy);
+                    if (dist >= 1f)
+                    {
+                        pixels[y * size + x] = Color.clear;
+                        continue;
+                    }
+
+                    float rim = Mathf.Clamp01(1f - Mathf.Abs(dist - 0.86f) * 8f);
+                    float fill = Mathf.Clamp01(0.28f * (1f - dist * 0.4f));
+                    float alpha = Mathf.Clamp01(Mathf.Max(rim * 0.92f, fill));
+                    pixels[y * size + x] = new Color(0.75f, 0.96f, 1f, alpha);
+                }
+            }
+            fallbackTex.SetPixels(pixels);
+            fallbackTex.Apply();
+            cachedBlockShieldSprite = Sprite.Create(fallbackTex, new Rect(0f, 0f, size, size), new Vector2(0.5f, 0.5f), 80f);
+            cachedBlockShieldSprite.name = "FX_BlockShield_Cyan_Fallback";
+            return cachedBlockShieldSprite;
         }
 
         protected virtual void Start()
@@ -476,7 +595,7 @@ namespace StickmanBeatEmUp.Characters
                     }
                     if (blockShieldVisual != null)
                     {
-                        blockShieldVisual.color = blockShieldBaseColor;
+                        ConfigureBlockShieldVisual();
                         blockShieldVisual.gameObject.SetActive(true);
                     }
                     break;
@@ -1052,6 +1171,20 @@ namespace StickmanBeatEmUp.Characters
 
             float incomingDamage = Mathf.Max(0f, damageData.damageAmount);
             bool blocking = IsBlocking;
+            bool blockingState = blocking || CurrentState == CharacterState.Block;
+
+            Vector3 hitPos = blockingState && blockShieldVisual != null
+                ? HitSparkManager.ResolveHitPoint(transform, null, blockShieldVisual, damageData.attacker)
+                : HitSparkManager.ResolveHitPoint(transform, col, spriteRenderer, damageData.attacker);
+
+            if (blockingState)
+            {
+                HitSparkManager.Spawn(hitPos, HitSparkManager.ShieldBlockCyanColor, 1.25f);
+            }
+            else
+            {
+                HitSparkManager.Spawn(hitPos);
+            }
 
             if (blocking)
             {
@@ -1083,6 +1216,16 @@ namespace StickmanBeatEmUp.Characters
                 OnHealthChanged?.Invoke(currentHealth, MaxHealth);
             }
 
+            Vector3 popupPos = transform.position + Vector3.up * 1.5f;
+            if (blocking)
+            {
+                DamagePopupManager.SpawnBlocked(popupPos, incomingDamage);
+            }
+            else if (incomingDamage > 0f)
+            {
+                DamagePopupManager.SpawnPlayerHit(popupPos, incomingDamage);
+            }
+
             if (currentHealth <= 0f)
             {
                 if (IsInTrainingMode())
@@ -1102,8 +1245,11 @@ namespace StickmanBeatEmUp.Characters
                 return;
             }
 
-            if (!hasHitStunImmunity)
+            bool isSkillActive = CurrentState == CharacterState.Skill;
+            bool isTransforming = CurrentState == CharacterState.Transform;
+            if (!hasHitStunImmunity && Time.time >= stunImmunityUntilTime && !isSkillActive && !isTransforming)
             {
+                stunImmunityUntilTime = Time.time + hurtDuration + stunImmunityDuration;
                 if (hurtCoroutine != null)
                 {
                     StopCoroutine(hurtCoroutine);
@@ -1174,19 +1320,24 @@ namespace StickmanBeatEmUp.Characters
                 rb.linearVelocity = knockback;
             }
 
-            // Hiệu ứng nhấp nháy đỏ khi bị thương
+            // Hiệu ứng nhấp nháy đỏ khi bị thương trong thời gian hurtDuration (0.15s)
             if (spriteRenderer != null)
             {
                 spriteRenderer.color = Color.red;
-                yield return new WaitForSeconds(0.15f);
+            }
+
+            yield return new WaitForSeconds(hurtDuration);
+
+            if (spriteRenderer != null)
+            {
                 spriteRenderer.color = Color.white;
             }
 
-            yield return new WaitForSeconds(stats != null ? stats.invulnerabilityDuration : 0.4f);
-
             isInvulnerable = false;
             hurtCoroutine = null;
-            if (currentState == CharacterState.Hurt)
+
+            // Phục hồi quyền điều khiển ngay lập tức sau hurtDuration (0.15s)
+            if (CurrentState == CharacterState.Hurt && CurrentState != CharacterState.Dead)
             {
                 ChangeState(CharacterState.Idle);
             }
@@ -1223,6 +1374,7 @@ namespace StickmanBeatEmUp.Characters
 
             isInvulnerable = false;
             isTrainingRespawnInvulnerable = false;
+            stunImmunityUntilTime = -999f;
             spinalFluidTimer = 0f;
             virtualShieldHp = 0f;
             spinalReflectDamage = 0f;
@@ -1272,6 +1424,7 @@ namespace StickmanBeatEmUp.Characters
             blockTimer = 0f;
             lastBlockTime = -10f;
             lastDashEndTime = -10f;
+            stunImmunityUntilTime = -999f;
 
             hazardSlowTimer = 0f;
             hazardSpeedMultiplier = 1f;

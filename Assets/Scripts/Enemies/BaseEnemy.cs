@@ -4,6 +4,7 @@ using UnityEngine;
 using StickmanBeatEmUp.Core;
 using StickmanBeatEmUp.Economy;
 using StickmanBeatEmUp.Enemies.Stats;
+using StickmanGame.VFX;
 
 namespace StickmanBeatEmUp.Enemies
 {
@@ -353,6 +354,8 @@ namespace StickmanBeatEmUp.Enemies
         public virtual void TakeDamage(DamageData damageData)
         {
             if (currentState == EnemyState.Dead) return;
+            Vector3 hitPos = HitSparkManager.ResolveHitPoint(transform, col, spriteRenderer, damageData.attacker);
+            HitSparkManager.Spawn(hitPos);
 
             float minHealth = EnemyBase.GlobalEnemyInvincible ? 1f : 0f;
             currentHealth -= damageData.damageAmount;

@@ -14,6 +14,7 @@ namespace StickmanBeatEmUp.Characters.Stats
 
         [Header("Health & Defense")]
         public float maxHealth = 100f;
+        public float hurtDuration = 0.15f;
         public float invulnerabilityDuration = 0.5f;
 
         [Header("Locomotion")]

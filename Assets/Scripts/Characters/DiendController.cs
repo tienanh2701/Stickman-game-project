@@ -31,6 +31,7 @@ namespace StickmanBeatEmUp.Characters
         [SerializeField] private float kivaLifetime = 15.0f;
 
         private LordKivaAI activeLordKivaInstance;
+        private BeamAttack activeChargingPiercingBeam;
 
         protected override float HitRageAmount => 0.75f;
 
@@ -40,16 +41,41 @@ namespace StickmanBeatEmUp.Characters
             kivaLifetime = 15.0f;
         }
 
+        private void OnDisable()
+        {
+            CancelChargingPiercingBeam();
+        }
+
+        protected override void ExitCurrentState(CharacterState state)
+        {
+            base.ExitCurrentState(state);
+            if (state == CharacterState.Skill)
+            {
+                CancelChargingPiercingBeam();
+            }
+        }
+
         protected override void OnDestroy()
         {
+            CancelChargingPiercingBeam();
             DespawnLordKiva();
             base.OnDestroy();
         }
 
         protected override void Die()
         {
+            CancelChargingPiercingBeam();
             DespawnLordKiva();
             base.Die();
+        }
+
+        private void CancelChargingPiercingBeam()
+        {
+            if (activeChargingPiercingBeam != null)
+            {
+                activeChargingPiercingBeam.CancelCharge();
+                activeChargingPiercingBeam = null;
+            }
         }
 
         protected override void OnTimedTransformExpired()
@@ -171,33 +197,77 @@ namespace StickmanBeatEmUp.Characters
             StartCoroutine(PiercingCardShotRoutine());
         }
 
+        private BeamAttack SpawnPiercingBeam(Vector3 spawnPos, float rawDamage, float activeDuration, float width)
+        {
+            if (piercingBeamPrefab == null)
+            {
+                return null;
+            }
+
+            GameObject beamObj = Instantiate(piercingBeamPrefab, spawnPos, Quaternion.identity);
+            BeamAttack beam = beamObj.GetComponent<BeamAttack>();
+            if (beam != null)
+            {
+                float beamDamage = GetModifiedDamage(rawDamage);
+                DamageData dData = new DamageData(
+                    beamDamage,
+                    stats.skill2Knockback,
+                    AttackType.Skill_I,
+                    true,
+                    gameObject
+                );
+                beam.SetupBeam(dData, facingDirection, enemyLayerMask, activeDuration, 20f, width);
+            }
+            return beam;
+        }
+
         private IEnumerator PiercingCardShotRoutine()
         {
             SetActionAnimation(CharacterState.Skill, 2);
             rb.linearVelocity = Vector2.zero;
 
+            if (isTransformed)
+            {
+                Transform anchor = projectileSpawnPoint != null ? projectileSpawnPoint : transform;
+                Vector3 anchorOffset = projectileSpawnPoint != null ? Vector3.zero : new Vector3(facingDirection * 0.9f, 0.85f, 0f);
+                Vector3 spawnPos = anchor.position + anchorOffset;
+
+                BeamAttack beam = SpawnPiercingBeam(spawnPos, stats.transformedSkill2Damage, 0.20f, 1.5f);
+                if (beam != null)
+                {
+                    beam.ConfigureSkillVfx(BeamAttack.BeamVisualStyle.DiendPiercingCard, anchor, anchorOffset, 0.18f, 0.28f, true);
+                    activeChargingPiercingBeam = beam;
+                }
+
+                yield return new WaitForSeconds(0.18f);
+                if (currentState != CharacterState.Skill || activeChargingPiercingBeam != beam)
+                {
+                    if (beam != null)
+                    {
+                        beam.CancelCharge();
+                    }
+                    if (activeChargingPiercingBeam == beam)
+                    {
+                        activeChargingPiercingBeam = null;
+                    }
+                    yield break;
+                }
+
+                activeChargingPiercingBeam = null;
+
+                yield return new WaitForSeconds(0.22f);
+                if (currentState == CharacterState.Skill)
+                {
+                    ChangeState(CharacterState.Idle);
+                }
+                yield break;
+            }
+
             yield return new WaitForSeconds(0.2f);
             if (currentState != CharacterState.Skill) yield break;
 
-            Vector3 spawnPos = projectileSpawnPoint != null ? projectileSpawnPoint.position : transform.position + new Vector3(facingDirection * 0.9f, 0.85f, 0f);
-
-            if (piercingBeamPrefab != null)
-            {
-                GameObject beamObj = Instantiate(piercingBeamPrefab, spawnPos, Quaternion.identity);
-                BeamAttack beam = beamObj.GetComponent<BeamAttack>();
-                if (beam != null)
-                {
-                    float beamDamage = GetModifiedDamage(isTransformed ? stats.transformedSkill2Damage : stats.skill2Damage);
-                    DamageData dData = new DamageData(
-                        beamDamage,
-                        stats.skill2Knockback,
-                        AttackType.Skill_I,
-                        true,
-                        gameObject
-                    );
-                    beam.SetupBeam(dData, facingDirection, enemyLayerMask, 0.15f, 20f, 1.2f);
-                }
-            }
+            Vector3 normalSpawnPos = projectileSpawnPoint != null ? projectileSpawnPoint.position : transform.position + new Vector3(facingDirection * 0.9f, 0.85f, 0f);
+            SpawnPiercingBeam(normalSpawnPos, stats.skill2Damage, 0.15f, 1.2f);
 
             yield return new WaitForSeconds(0.2f);
             if (currentState == CharacterState.Skill)

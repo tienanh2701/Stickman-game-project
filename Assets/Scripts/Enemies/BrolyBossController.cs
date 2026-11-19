@@ -2,6 +2,8 @@ using System.Collections;
 using UnityEngine;
 using StickmanBeatEmUp.Core;
 using StickmanBeatEmUp.Level;
+using StickmanBeatEmUp.UI;
+using StickmanGame.VFX;
 
 namespace StickmanBeatEmUp.Enemies
 {
@@ -139,6 +141,9 @@ namespace StickmanBeatEmUp.Enemies
                 }
 
                 // While hasGreenShield == true, non-armor-breaking hits trigger TriggerWhiteFlash() and deal 0f damage
+                Vector3 hitPos = HitSparkManager.ResolveHitPoint(transform, mainCol, spriteRenderer, damageData.attacker);
+                HitSparkManager.Spawn(hitPos, HitSparkManager.ShieldBlockCyanColor, 1.15f);
+                DamagePopupManager.SpawnBlocked(hitPos + Vector3.up * 0.35f);
                 TriggerWhiteFlash();
                 return;
             }

@@ -1,6 +1,7 @@
 using System.Collections;
 using UnityEngine;
 using StickmanBeatEmUp.Core;
+using StickmanGame.VFX;
 
 namespace StickmanBeatEmUp.Enemies
 {
@@ -50,6 +51,19 @@ namespace StickmanBeatEmUp.Enemies
                 float speed = enemyData != null ? enemyData.moveSpeed : 4.2f;
                 MoveHorizontally(Mathf.Sign(playerTarget.position.x - transform.position.x), speed);
                 SetAnimState(0);
+            }
+        }
+
+        protected override void SpawnHitSpark(DamageData damageData)
+        {
+            Vector3 hitPos = HitSparkManager.ResolveHitPoint(transform, col, spriteRenderer, damageData.attacker);
+            if (isParrying)
+            {
+                HitSparkManager.Spawn(hitPos, HitSparkManager.ShieldBlockCyanColor, 1.15f);
+            }
+            else
+            {
+                HitSparkManager.Spawn(hitPos);
             }
         }
 

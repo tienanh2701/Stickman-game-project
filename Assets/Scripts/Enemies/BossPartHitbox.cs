@@ -2,6 +2,8 @@ using System;
 using System.Collections;
 using UnityEngine;
 using StickmanBeatEmUp.Core;
+using StickmanBeatEmUp.UI;
+using StickmanGame.VFX;
 
 namespace StickmanBeatEmUp.Enemies
 {
@@ -32,10 +34,12 @@ namespace StickmanBeatEmUp.Enemies
         public event Action<BossPartHitbox> OnPartDestroyed;
 
         private Color baseColor = Color.white;
+        private Collider2D partCollider;
 
         private void Awake()
         {
             gameObject.layer = LayerMask.NameToLayer("Enemy") >= 0 ? LayerMask.NameToLayer("Enemy") : 8;
+            partCollider = GetComponent<Collider2D>();
             if (partRenderer == null) partRenderer = GetComponent<SpriteRenderer>();
             if (partRenderer != null) baseColor = partRenderer.color;
         }
@@ -65,19 +69,36 @@ namespace StickmanBeatEmUp.Enemies
 
         public void TakeDamage(DamageData damageData)
         {
-            if (IsDead || !IsVulnerable) return;
+            if (IsDead) return;
+
+            Vector3 hitPos = HitSparkManager.ResolveHitPoint(transform, partCollider, partRenderer, damageData.attacker);
+            if (!IsVulnerable)
+            {
+                HitSparkManager.Spawn(hitPos, HitSparkManager.ShieldBlockCyanColor, 1.15f);
+                DamagePopupManager.SpawnBlocked(hitPos);
+                return;
+            }
+
+            HitSparkManager.Spawn(hitPos);
 
             float mult = 1f;
             float finalDmg = damageData.damageAmount * mult;
             CurrentHealth = Mathf.Max(0f, CurrentHealth - finalDmg);
+            if (finalDmg > 0f)
+            {
+                DamagePopupManager.SpawnDamage(
+                    hitPos,
+                    finalDmg,
+                    damageData.attackType,
+                    partRole == BossPartRole.ChestCore || damageData.breaksSuperArmor);
+            }
             OnPartDamaged?.Invoke(this, finalDmg, damageData);
             StartCoroutine(FlashRoutine());
 
             if (CurrentHealth <= 0f)
             {
                 IsDead = true;
-                Collider2D col = GetComponent<Collider2D>();
-                if (col != null) col.enabled = false;
+                if (partCollider != null) partCollider.enabled = false;
                 if (partRenderer != null) partRenderer.color = new Color(0.25f, 0.25f, 0.25f, 0.45f);
                 OnPartDestroyed?.Invoke(this);
             }

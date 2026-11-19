@@ -17,7 +17,7 @@ namespace StickmanBeatEmUp.GameModes
     /// - Full Attack on Titan arena [-22 .. 42], groundY = -2.5
     /// - Categorized 3-World pools (Melee Creeps, Ranged Creeps, Elites, Bosses) with Zero-Null fallback
     /// - Wave progression with 3s rest +10 HP between cleared waves
-    /// - Per-instance enemy scaling (HP, DMG, Speed, Tenacity -30% stagger at W5+, Red Aura Enraged at W8+, Adaptive Armor DR & 1.2x speed at W12+)
+    /// - Per-instance enemy scaling (HP +3%/w, DMG +1.5%/w cap 1.75x, Speed +0.8%/w cap 1.25x, Tenacity -20% stagger at W10+, Red Aura Enraged 15% at W15+, Adaptive Armor DR 10%-25% & 1.12x speed at W20+; gentle Boss tier scaling every 5 waves)
     /// - Escalating Creeps, Elites (Wave 3+ every 2 waves), and World Bosses every 5 waves (Wave 5, 10, 15...)
     /// </summary>
     public class EndlessModeManager : MonoBehaviour
@@ -283,9 +283,17 @@ namespace StickmanBeatEmUp.GameModes
         public void ApplyEndlessScaling(EnemyBase enemy, int wave)
         {
             if (enemy == null) return;
+            bool isCreep = !(enemy is EliteEnemy) && (enemy.Data == null || (!enemy.Data.isElite && !enemy.Data.isBoss));
+            ApplyEndlessScaling(enemy, wave, isCreep);
+        }
 
+        public void ApplyEndlessScaling(EnemyBase enemy, int wave, bool isCreep)
+        {
+            if (enemy == null) return;
+
+            int w = Mathf.Max(1, wave);
             ComputeWaveScaling(
-                wave,
+                w,
                 out float hpMult,
                 out float dmgMult,
                 out float moveSpeedMult,
@@ -293,8 +301,7 @@ namespace StickmanBeatEmUp.GameModes
                 out float damageReduction,
                 out float attackSpeedMult);
 
-            bool isCreep = !(enemy is EliteEnemy) && (enemy.Data == null || (!enemy.Data.isElite && !enemy.Data.isBoss));
-            bool isEnraged = Mathf.Max(1, wave) >= 8 && isCreep && UnityEngine.Random.value < 0.20f;
+            bool isEnraged = isCreep && w >= 15 && UnityEngine.Random.value < 0.15f;
 
             enemy.ApplyEndlessModifiers(
                 hpMult,
@@ -310,22 +317,22 @@ namespace StickmanBeatEmUp.GameModes
         {
             if (boss == null) return;
 
-            ComputeWaveScaling(
+            ComputeBossWaveScaling(
                 wave,
-                out float hpMult,
-                out float dmgMult,
-                out float moveSpeedMult,
-                out float staggerMult,
-                out float damageReduction,
-                out float attackSpeedMult);
+                out float bossHpMult,
+                out float bossDmgMult,
+                out float bossSpeedMult,
+                out float bossStaggerMult,
+                out float bossDrPct,
+                out float bossAtkSpd);
 
             boss.ApplyEndlessModifiers(
-                hpMult,
-                dmgMult,
-                moveSpeedMult,
-                staggerMult,
-                damageReduction,
-                attackSpeedMult,
+                bossHpMult,
+                bossDmgMult,
+                bossSpeedMult,
+                bossStaggerMult,
+                bossDrPct,
+                bossAtkSpd,
                 false);
         }
 
@@ -339,12 +346,31 @@ namespace StickmanBeatEmUp.GameModes
             out float attackSpeedMult)
         {
             int w = Mathf.Max(1, wave);
-            hpMult = 1f + 0.08f * (w - 1);
-            dmgMult = 1f + 0.05f * (w - 1);
-            moveSpeedMult = Mathf.Min(1.40f, 1f + 0.02f * (w - 1));
-            staggerMult = w >= 5 ? 0.70f : 1f;
-            damageReduction = w >= 12 ? Mathf.Min(0.40f, 0.15f + 0.05f * ((w - 12) / 5)) : 0f;
-            attackSpeedMult = w >= 12 ? 1.20f : 1f;
+            hpMult = 1f + 0.03f * (w - 1);
+            dmgMult = Mathf.Min(1.75f, 1f + 0.015f * (w - 1));
+            moveSpeedMult = Mathf.Min(1.25f, 1f + 0.008f * (w - 1));
+            staggerMult = w >= 10 ? 0.80f : 1f;
+            damageReduction = w >= 20 ? Mathf.Min(0.25f, 0.10f + 0.05f * ((w - 20) / 5)) : 0f;
+            attackSpeedMult = w >= 20 ? 1.12f : 1f;
+        }
+
+        private static void ComputeBossWaveScaling(
+            int wave,
+            out float bossHpMult,
+            out float bossDmgMult,
+            out float bossSpeedMult,
+            out float bossStaggerMult,
+            out float bossDrPct,
+            out float bossAtkSpd)
+        {
+            int w = Mathf.Max(1, wave);
+            int bossTier = Mathf.Max(0, (w / 5) - 1);
+            bossHpMult = 1f + 0.10f * bossTier;
+            bossDmgMult = w <= 5 ? 1f : Mathf.Min(1.75f, 1f + 0.015f * (w - 5));
+            bossSpeedMult = w <= 5 ? 1f : Mathf.Min(1.25f, 1f + 0.008f * (w - 5));
+            bossStaggerMult = w >= 10 ? 0.80f : 1f;
+            bossDrPct = w >= 20 ? Mathf.Min(0.25f, 0.10f + 0.05f * ((w - 20) / 5)) : 0f;
+            bossAtkSpd = w >= 20 ? 1.10f : 1f;
         }
 
         private BaseCharacter ResolvePlayer(BaseCharacter candidate)
@@ -362,9 +388,37 @@ namespace StickmanBeatEmUp.GameModes
 
         private void HandlePlayerStateChanged(CharacterState state)
         {
-            if (state == CharacterState.Dead && isRunning)
+            if (state == CharacterState.Dead)
             {
-                StopEndless();
+                HandlePlayerDied();
+            }
+        }
+
+        private void HandlePlayerDied()
+        {
+            StopEndless();
+
+            GameUIManager ui = GameUIManager.Instance;
+            if (ui != null)
+            {
+                ui.HideEndlessWaveBanner();
+                ui.UnbindBoss();
+            }
+        }
+
+        private void CalculateWaveComposition(int wave, out int creepCount, out int eliteCount, out int bossCount)
+        {
+            int w = Mathf.Max(1, wave);
+            creepCount = 3 + Mathf.FloorToInt(w * 1.2f);
+            eliteCount = (w >= 3 && (w - 3) % 2 == 0)
+                ? 1 + Mathf.FloorToInt((w - 3) / 3f)
+                : 0;
+            bossCount = (w >= 5 && w % 5 == 0 && bosses.Count > 0) ? 1 : 0;
+
+            if (w % 5 == 0 || bossCount > 0)
+            {
+                creepCount = Mathf.Clamp(Mathf.Max(2, creepCount / 2), 2, 3);
+                eliteCount = 0;
             }
         }
 
@@ -375,11 +429,7 @@ namespace StickmanBeatEmUp.GameModes
             while (isRunning && activePlayer != null && !activePlayer.IsDead)
             {
                 int wave = currentWave;
-                int creepCount = 3 + Mathf.FloorToInt(wave * 1.2f);
-                int eliteCount = (wave >= 3 && (wave - 3) % 2 == 0)
-                    ? 1 + Mathf.FloorToInt((wave - 3) / 3f)
-                    : 0;
-                int bossCount = (wave >= 5 && wave % 5 == 0 && bosses.Count > 0) ? 1 : 0;
+                CalculateWaveComposition(wave, out int creepCount, out int eliteCount, out int bossCount);
 
                 bool hasAnyCreep = meleeCreeps.Count > 0 || rangedCreeps.Count > 0 || elites.Count > 0 || bosses.Count > 0;
                 int actualCreepCount = hasAnyCreep ? creepCount : 0;
@@ -651,6 +701,7 @@ namespace StickmanBeatEmUp.GameModes
 
         private void UpdateRemainingHudCount()
         {
+            if (!isRunning || (activePlayer != null && activePlayer.IsDead)) return;
             int remaining = activeEnemies.Count + Mathf.Max(0, pendingSpawnCount);
             SyncHudWaveAndCount(currentWave, remaining);
         }
@@ -1022,24 +1073,30 @@ namespace StickmanBeatEmUp.GameModes
 
             restBannerObj = new GameObject("EndlessRestCountdownBanner", typeof(RectTransform), typeof(Image));
             restBannerObj.transform.SetParent(canvas.transform, false);
+            Transform victoryTr = canvas.transform.Find("VictoryPanel");
+            if (victoryTr != null)
+            {
+                restBannerObj.transform.SetSiblingIndex(Mathf.Max(0, victoryTr.GetSiblingIndex()));
+            }
             RectTransform rt = restBannerObj.GetComponent<RectTransform>();
             rt.anchorMin = new Vector2(0.5f, 1f);
             rt.anchorMax = new Vector2(0.5f, 1f);
             rt.pivot = new Vector2(0.5f, 1f);
-            rt.anchoredPosition = new Vector2(0f, -126f);
-            rt.sizeDelta = new Vector2(560f, 38f);
+            rt.anchoredPosition = new Vector2(0f, -92f);
+            rt.sizeDelta = new Vector2(620f, 38f);
 
             Image bg = restBannerObj.GetComponent<Image>();
             bg.color = new Color(0.08f, 0.14f, 0.22f, 0.88f);
             bg.raycastTarget = false;
+            GlassHudTheme.ApplySprite(bg, "StatusPill_Emerald.png", default, true, false);
 
             GameObject txtObj = new GameObject("Label", typeof(RectTransform), typeof(TextMeshProUGUI));
             txtObj.transform.SetParent(restBannerObj.transform, false);
             RectTransform trt = txtObj.GetComponent<RectTransform>();
             trt.anchorMin = Vector2.zero;
             trt.anchorMax = Vector2.one;
-            trt.offsetMin = new Vector2(10f, 2f);
-            trt.offsetMax = new Vector2(-10f, -2f);
+            trt.offsetMin = new Vector2(18f, 2f);
+            trt.offsetMax = new Vector2(-18f, -2f);
 
             restBannerText = txtObj.GetComponent<TextMeshProUGUI>();
             TextMeshProUGUI[] existingTexts = canvas.GetComponentsInChildren<TextMeshProUGUI>(true);
@@ -1052,10 +1109,8 @@ namespace StickmanBeatEmUp.GameModes
                 }
             }
             restBannerText.alignment = TextAlignmentOptions.Center;
-            restBannerText.fontSize = 20f;
-            restBannerText.fontStyle = FontStyles.Bold;
-            restBannerText.color = new Color(0.45f, 1f, 0.65f, 1f);
             restBannerText.raycastTarget = false;
+            GlassHudTheme.StyleTmpText(restBannerText, 17f, new Color(0.55f, 1f, 0.72f, 1f), true, true);
 
             restBannerObj.SetActive(false);
         }

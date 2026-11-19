@@ -142,13 +142,15 @@ namespace StickmanBeatEmUp.Level
 
         private static void ResetModeGlobalFlags()
         {
-            if (CurrencyManager.HasInstance)
+            CurrencyManager cm = CurrencyManager.HasInstance ? CurrencyManager.Instance : null;
+            if (cm != null)
             {
-                CurrencyManager.Instance.SuppressEnemyRewards = false;
+                cm.SuppressEnemyRewards = false;
             }
-            if (InventoryManager.HasInstance)
+            InventoryManager inv = InventoryManager.HasInstance ? InventoryManager.Instance : null;
+            if (inv != null)
             {
-                InventoryManager.Instance.IsTrainingFreeUseMode = false;
+                inv.IsTrainingFreeUseMode = false;
             }
         }
 
@@ -592,6 +594,7 @@ namespace StickmanBeatEmUp.Level
 
         private void HandleBossBaseDefeated(BossBase boss)
         {
+            if (boss != null && !boss.IsDead) return;
             if (boss != null) boss.OnBossDefeated -= HandleBossBaseDefeated;
             DecrementWaveEnemyCount();
         }

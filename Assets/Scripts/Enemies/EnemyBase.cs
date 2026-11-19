@@ -5,6 +5,8 @@ using StickmanBeatEmUp.Core;
 using StickmanBeatEmUp.Characters;
 using StickmanBeatEmUp.Economy;
 using StickmanBeatEmUp.Enemies.Stats;
+using StickmanBeatEmUp.UI;
+using StickmanGame.VFX;
 
 namespace StickmanBeatEmUp.Enemies
 {
@@ -468,14 +470,49 @@ namespace StickmanBeatEmUp.Enemies
         /// <summary>Subclasses implement specific movement / attack decision loop.</summary>
         protected abstract void TickBehavior();
 
+        protected virtual void SpawnHitSpark(DamageData damageData)
+        {
+            Vector3 hitPos = HitSparkManager.ResolveHitPoint(transform, col, spriteRenderer, damageData.attacker);
+            HitSparkManager.Spawn(hitPos);
+        }
+
         public virtual void TakeDamage(DamageData damageData)
         {
             if (IsDead) return;
+            Vector3 hitPos = HitSparkManager.ResolveHitPoint(transform, col, spriteRenderer, damageData.attacker);
+            SpawnHitSpark(damageData);
 
+            float prevHealth = CurrentHealth;
             float reducedDamage = damageData.damageAmount * Mathf.Clamp01(1f - runtimeDamageReduction);
             float minHealth = GlobalEnemyInvincible ? 1f : 0f;
             CurrentHealth = Mathf.Max(minHealth, CurrentHealth - reducedDamage);
             OnHealthChanged?.Invoke(CurrentHealth, MaxHealth);
+
+            Vector3 popupWorldPos = hitPos + Vector3.up * 0.35f;
+            if (IsShielded)
+            {
+                DamagePopupManager.SpawnBlocked(popupWorldPos);
+            }
+            else if (GlobalEnemyInvincible)
+            {
+                float dealt = Mathf.Max(0f, prevHealth - CurrentHealth);
+                if (dealt > 0.001f)
+                {
+                    DamagePopupManager.SpawnDamage(
+                        popupWorldPos,
+                        dealt,
+                        damageData.attackType,
+                        damageData.breaksSuperArmor || dealt >= 24f);
+                }
+            }
+            else if (reducedDamage > 0f)
+            {
+                DamagePopupManager.SpawnDamage(
+                    popupWorldPos,
+                    reducedDamage,
+                    damageData.attackType,
+                    damageData.breaksSuperArmor || reducedDamage >= 24f);
+            }
 
             if (!GlobalEnemyInvincible && CurrentHealth <= 0f)
             {

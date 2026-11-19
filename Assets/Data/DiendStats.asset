@@ -14,6 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::StickmanBeatEmUp.Characters.Stats.CharacterStatsSO
   characterName: Diend Stickman
   maxHealth: 100
+  hurtDuration: 0.15
   invulnerabilityDuration: 0.5
   moveSpeed: 6
   jumpForce: 12

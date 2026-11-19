@@ -5,6 +5,8 @@ using StickmanBeatEmUp.Core;
 using StickmanBeatEmUp.Characters;
 using StickmanBeatEmUp.Economy;
 using StickmanBeatEmUp.Enemies.Stats;
+using StickmanBeatEmUp.UI;
+using StickmanGame.VFX;
 
 namespace StickmanBeatEmUp.Enemies
 {
@@ -423,12 +425,26 @@ namespace StickmanBeatEmUp.Enemies
         public virtual void TakeDamage(DamageData damageData)
         {
             if (IsDead) return;
+            Vector3 hitPos = HitSparkManager.ResolveHitPoint(transform, mainCol, spriteRenderer, damageData.attacker);
+            HitSparkManager.Spawn(hitPos);
             float reducedInput = damageData.damageAmount * (1f - Mathf.Clamp01(runtimeDamageReduction));
             float dmg = reducedInput * damageMultiplier;
             float minHealth = EnemyBase.GlobalEnemyInvincible ? 1f : 0f;
+            float prevHealth = CurrentHealth;
             CurrentHealth = Mathf.Max(minHealth, CurrentHealth - dmg);
             NotifyHealthChanged();
             TriggerWhiteFlash();
+
+            float finalDmg = EnemyBase.GlobalEnemyInvincible ? Mathf.Max(0f, prevHealth - CurrentHealth) : dmg;
+            if (finalDmg > 0.001f)
+            {
+                Vector3 popupWorldPos = hitPos + Vector3.up * 0.45f;
+                DamagePopupManager.SpawnDamage(
+                    popupWorldPos,
+                    finalDmg,
+                    damageData.attackType,
+                    damageData.breaksSuperArmor || isVulnerableStagger || finalDmg >= 24f);
+            }
 
             if (!EnemyBase.GlobalEnemyInvincible && CurrentHealth <= 0f)
             {

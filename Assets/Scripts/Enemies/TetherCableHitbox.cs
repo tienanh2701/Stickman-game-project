@@ -5,8 +5,8 @@ using StickmanBeatEmUp.Core;
 namespace StickmanBeatEmUp.Enemies
 {
     /// <summary>
-    /// Mid-cable destructible target connecting War Hammer Titan to CrystalCore.
-    /// Player can sever the cable directly or break CrystalCore to stop regeneration.
+    /// Non-destructible visual anchor on the tether connecting War Hammer Titan to CrystalCore.
+    /// Collider is disabled and TakeDamage is a no-op so the tether can only be broken by destroying the 500 HP CrystalCore.
     /// </summary>
     [RequireComponent(typeof(Collider2D))]
     public class TetherCableHitbox : MonoBehaviour, IDamageable
@@ -16,13 +16,28 @@ namespace StickmanBeatEmUp.Enemies
 
         public Transform Transform => transform;
         public bool IsDead { get; private set; }
+        public float CurrentHealth => currentHealth;
 
-        public event Action OnCableSevered;
+        public event Action OnCableSevered
+        {
+            add { }
+            remove { }
+        }
 
         private float currentHealth;
+        private Collider2D cableCollider;
+
+        private void Awake()
+        {
+            cableCollider = GetComponent<Collider2D>();
+            if (cableCollider != null) cableCollider.enabled = false;
+            if (indicatorRenderer != null) indicatorRenderer.enabled = false;
+            currentHealth = cableHealth;
+        }
 
         private void Start()
         {
+            if (cableCollider != null) cableCollider.enabled = false;
             currentHealth = cableHealth;
         }
 
@@ -34,16 +49,7 @@ namespace StickmanBeatEmUp.Enemies
 
         public void TakeDamage(DamageData damageData)
         {
-            if (IsDead) return;
-            currentHealth = Mathf.Max(0f, currentHealth - damageData.damageAmount);
-            if (currentHealth <= 0f)
-            {
-                IsDead = true;
-                Collider2D col = GetComponent<Collider2D>();
-                if (col != null) col.enabled = false;
-                if (indicatorRenderer != null) indicatorRenderer.enabled = false;
-                OnCableSevered?.Invoke();
-            }
+            // No-op: tether cannot be severed directly; player must shatter the 500 HP CrystalCore while Titan is downed.
         }
     }
 }

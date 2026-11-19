@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using UnityEngine;
 using StickmanBeatEmUp.Core;
 using StickmanBeatEmUp.Combat;
+using StickmanBeatEmUp.Enemies;
+using StickmanBeatEmUp.Level;
 
 namespace StickmanBeatEmUp.Characters
 {
@@ -41,6 +43,8 @@ namespace StickmanBeatEmUp.Characters
         private Vector2 originalMeleeBoxOffset;
         private Vector3 originalMeleeLocalPos;
         private bool isMeleeBoxModified = false;
+        private GameObject activeChargingGenkiDama;
+        private BeamAttack activeChargingKamehameha;
 
         protected override void Awake()
         {
@@ -51,6 +55,8 @@ namespace StickmanBeatEmUp.Characters
         private void OnDisable()
         {
             RestoreNormalHitbox();
+            CleanupUnlaunchedGenkiDama();
+            CancelChargingKamehameha();
         }
 
         protected override void ExitCurrentState(CharacterState state)
@@ -59,6 +65,7 @@ namespace StickmanBeatEmUp.Characters
             if (state == CharacterState.Skill)
             {
                 RestoreNormalHitbox();
+                CancelChargingKamehameha();
             }
         }
 
@@ -71,7 +78,27 @@ namespace StickmanBeatEmUp.Characters
         protected override void Die()
         {
             RestoreNormalHitbox();
+            CleanupUnlaunchedGenkiDama();
+            CancelChargingKamehameha();
             base.Die();
+        }
+
+        private void CancelChargingKamehameha()
+        {
+            if (activeChargingKamehameha != null)
+            {
+                activeChargingKamehameha.CancelCharge();
+                activeChargingKamehameha = null;
+            }
+        }
+
+        private void CleanupUnlaunchedGenkiDama()
+        {
+            if (activeChargingGenkiDama != null)
+            {
+                Destroy(activeChargingGenkiDama);
+                activeChargingGenkiDama = null;
+            }
         }
 
         private void CacheMeleeBoxDefaults()
@@ -301,16 +328,15 @@ namespace StickmanBeatEmUp.Characters
             SetActionAnimation(CharacterState.Skill, 2);
             rb.linearVelocity = Vector2.zero;
 
-            // Gồng Kamehameha 0.3s
-            yield return new WaitForSeconds(0.3f);
-            if (currentState != CharacterState.Skill) yield break;
+            Transform anchor = projectileSpawnPoint != null ? projectileSpawnPoint : transform;
+            Vector3 anchorOffset = projectileSpawnPoint != null ? Vector3.zero : new Vector3(facingDirection * 0.9f, 0.85f, 0f);
+            Vector3 spawnPos = anchor.position + anchorOffset;
 
-            Vector3 spawnPos = projectileSpawnPoint != null ? projectileSpawnPoint.position : transform.position + new Vector3(facingDirection * 0.9f, 0.85f, 0f);
-
+            BeamAttack beam = null;
             if (kamehamehaPrefab != null)
             {
                 GameObject beamObj = Instantiate(kamehamehaPrefab, spawnPos, Quaternion.identity);
-                BeamAttack beam = beamObj.GetComponent<BeamAttack>();
+                beam = beamObj.GetComponent<BeamAttack>();
                 if (beam != null)
                 {
                     float beamTickDamage = GetModifiedDamage(stats.transformedSkill2Damage / 5f);
@@ -322,8 +348,27 @@ namespace StickmanBeatEmUp.Characters
                         gameObject
                     );
                     beam.SetupBeam(dData, facingDirection, enemyLayerMask, 0.9f, 18f, 2.5f);
+                    beam.ConfigureSkillVfx(BeamAttack.BeamVisualStyle.GokuKamehameha, anchor, anchorOffset, 0.3f, 0.18f, false);
+                    activeChargingKamehameha = beam;
                 }
             }
+
+            // Gồng Kamehameha 0.3s (hiệu ứng tụ cầu Ki phát trực tiếp ở tay)
+            yield return new WaitForSeconds(0.3f);
+            if (currentState != CharacterState.Skill || activeChargingKamehameha != beam)
+            {
+                if (beam != null)
+                {
+                    beam.CancelCharge();
+                }
+                if (activeChargingKamehameha == beam)
+                {
+                    activeChargingKamehameha = null;
+                }
+                yield break;
+            }
+
+            activeChargingKamehameha = null;
 
             yield return new WaitForSeconds(0.9f);
             if (currentState == CharacterState.Skill)
@@ -423,45 +468,103 @@ namespace StickmanBeatEmUp.Characters
         private IEnumerator GenkiDamaRoutine()
         {
             SetActionAnimation(CharacterState.Skill, 3);
-            rb.linearVelocity = Vector2.zero;
+            if (rb != null) rb.linearVelocity = Vector2.zero;
             isGravityOverriddenBySkill = true;
-            rb.gravityScale = 0f;
+            if (rb != null) rb.gravityScale = 0f;
             isInvulnerable = true;
+
+            bool bombLaunched = false;
 
             try
             {
                 // Nhảy lơ lửng lên không trung tích quả cầu Genki Dama
                 Vector3 startPos = transform.position;
-                Vector3 airPos = startPos + Vector3.up * 3f;
+                Vector3 airPos = new Vector3(startPos.x, Mathf.Min(startPos.y + 3f, mapMaxY - 0.5f), startPos.z);
                 float t = 0f;
                 while (t < 0.2f)
                 {
-                    if (IsDead) yield break;
+                    if (IsDead || currentState != CharacterState.Skill) yield break;
+                    isInvulnerable = true;
+                    if (rb != null) rb.linearVelocity = Vector2.zero;
                     transform.position = Vector3.Lerp(startPos, airPos, t / 0.2f);
                     t += Time.deltaTime;
                     yield return null;
                 }
+                transform.position = airPos;
 
-                yield return new WaitForSeconds(0.5f);
-                if (IsDead) yield break;
+                if (IsDead || currentState != CharacterState.Skill) yield break;
 
-                // Ném quả cầu Genki Dama khổng lồ
-                Vector3 bombSpawnPos = startPos + new Vector3(facingDirection * 4.2f, 0.5f, 0f);
-                if (genkiDamaPrefab != null)
+                Camera cam = Camera.main != null ? Camera.main : FindAnyObjectByType<Camera>();
+                float mapVerticalHeight = (cam != null && cam.orthographic) ? cam.orthographicSize * 2f : 10f;
+                Vector3 overheadOffset = new Vector3(0f, Mathf.Max(2.8f, mapVerticalHeight * 0.28f), 0f);
+                Vector3 spawnPos = transform.position + overheadOffset;
+
+                GameObject bombObj = genkiDamaPrefab != null
+                    ? Instantiate(genkiDamaPrefab, spawnPos, Quaternion.identity)
+                    : new GameObject("GenkiDama_Runtime");
+                bombObj.transform.position = spawnPos;
+                activeChargingGenkiDama = bombObj;
+
+                if (bombObj.TryGetComponent(out Explosion legacyExp))
                 {
-                    GameObject bomb = Instantiate(genkiDamaPrefab, bombSpawnPos, Quaternion.identity);
-                    Explosion exp = bomb.GetComponent<Explosion>();
-                    if (exp != null)
-                    {
-                        float genkiDamage = GetModifiedDamage(stats.specialComboDamage);
-                        exp.Setup(genkiDamage, 8f, enemyLayerMask, gameObject, AttackType.Combo_DashI, true);
-                    }
+                    legacyExp.enabled = false;
+                    Destroy(legacyExp);
+                }
+                if (bombObj.TryGetComponent(out Projectile legacyProj))
+                {
+                    legacyProj.enabled = false;
+                    Destroy(legacyProj);
                 }
 
-                yield return new WaitForSeconds(0.5f);
+                GenkiDamaProjectile genkiProj = bombObj.GetComponent<GenkiDamaProjectile>();
+                if (genkiProj == null)
+                {
+                    genkiProj = bombObj.AddComponent<GenkiDamaProjectile>();
+                }
+
+                float rawDamage = (stats != null ? stats.specialComboDamage : 35f) * (isKaiokenActive ? kaiokenDamageBonus : 1f);
+                float genkiDamage = GetModifiedDamage(rawDamage);
+                genkiProj.Initialize(gameObject, genkiDamage, facingDirection, enemyLayerMask, EnemyBase.GROUND_Y);
+
+                // Gồng tụ năng lượng Spirit Bomb trên đỉnh đầu trong ~0.55s
+                const float chargeDuration = 0.55f;
+                float chargeElapsed = 0f;
+                while (chargeElapsed < chargeDuration)
+                {
+                    if (IsDead || currentState != CharacterState.Skill) yield break;
+                    isInvulnerable = true;
+                    if (rb != null) rb.linearVelocity = Vector2.zero;
+
+                    float progress = Mathf.Clamp01(chargeElapsed / chargeDuration);
+                    float easedProgress = 1f - Mathf.Pow(1f - progress, 2f);
+                    genkiProj.SetChargeProgress(easedProgress);
+                    bombObj.transform.position = transform.position + overheadOffset;
+
+                    CameraFollowBeatEmUp.Instance?.Shake(0.08f, Mathf.Lerp(0.03f, 0.09f, progress));
+
+                    chargeElapsed += Time.deltaTime;
+                    yield return null;
+                }
+
+                if (IsDead || currentState != CharacterState.Skill) yield break;
+
+                genkiProj.SetChargeProgress(1f);
+                bombObj.transform.position = transform.position + overheadOffset;
+
+                // Phóng quả cầu Genki Dama hướng về mục tiêu gần nhất phía trước & mặt đất
+                Vector2 launchVelocity = genkiProj.ComputeTargetAimVelocity(bombObj.transform.position);
+                genkiProj.Launch(launchVelocity);
+                bombLaunched = true;
+                activeChargingGenkiDama = null;
+
+                yield return new WaitForSeconds(0.35f);
             }
             finally
             {
+                if (!bombLaunched)
+                {
+                    CleanupUnlaunchedGenkiDama();
+                }
                 isGravityOverriddenBySkill = false;
                 ApplyEffectiveGravity();
                 isInvulnerable = false;

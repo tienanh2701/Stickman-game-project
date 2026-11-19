@@ -8,7 +8,7 @@ namespace StickmanBeatEmUp.Enemies
     /// <summary>
     /// World 1 (AoT) Boss: War Hammer Titan + Cart Titan artillery + Crystal Core Tether.
     /// Animator States: 0=HammerSmash, 1=GroundSpikes, 2=Hit/Downed, 3=Destroyed.
-    /// When War Hammer HP hits 0 with tether intact, kneels for 5s and regenerates 50% unless cable or CrystalCore is broken!
+    /// When War Hammer HP hits 0 with CrystalCore intact, kneels for 10s and revives to 100% HP unless the 500 HP CrystalCore is shattered!
     /// </summary>
     public class TetherBossController : BossBase
     {
@@ -22,9 +22,10 @@ namespace StickmanBeatEmUp.Enemies
         [SerializeField] private Transform cartTurretFirePoint;
 
         private bool detachedPartners;
+        private bool hasStarted;
 
         [Header("Timing")]
-        [SerializeField] private float downedReviveDelay = 5f;
+        [SerializeField] private float downedReviveDelay = 10f;
         [SerializeField] private float cartArtilleryInterval = 4.2f;
         [SerializeField] private float cartCannonDamage = 8f;
 
@@ -35,6 +36,8 @@ namespace StickmanBeatEmUp.Enemies
         private Coroutine downedRoutine;
 
         protected override int DeathAnimState => 3;
+        public bool IsDowned => isDowned;
+        public bool IsMainBodyDefeated => IsDead || isDowned || (hasStarted && CurrentHealth <= 0f);
 
         public void ConfigureBossPrefabs(GameObject spikesPrefab, GameObject cartProjPrefab)
         {
@@ -45,9 +48,15 @@ namespace StickmanBeatEmUp.Enemies
         protected override void Awake()
         {
             base.Awake();
+            if (downedReviveDelay < 10f) downedReviveDelay = 10f;
             if (crystalCore == null) crystalCore = GetComponentInChildren<CrystalCore>();
             if (tetherCable == null) tetherCable = GetComponentInChildren<TetherCableHitbox>();
             if (tetherLine == null) tetherLine = GetComponentInChildren<LineRenderer>();
+
+            if (crystalCore != null)
+            {
+                crystalCore.BindMainTitanBody(this);
+            }
 
             if (tetherLine != null)
             {
@@ -60,36 +69,67 @@ namespace StickmanBeatEmUp.Enemies
         protected override void Start()
         {
             base.Start();
+            hasStarted = true;
+
+            float cartHalfWidth = 1.45f;
+            if (cartTitanVisual != null)
+            {
+                cartTitanVisual.SetParent(null, true);
+                cartTitanVisual.localScale = new Vector3(-Mathf.Abs(cartTitanVisual.localScale.x), Mathf.Abs(cartTitanVisual.localScale.y), 1f);
+                SpriteRenderer cartSr = cartTitanVisual.GetComponentInChildren<SpriteRenderer>();
+                if (cartSr != null && cartSr.sprite != null)
+                {
+                    cartHalfWidth = cartSr.sprite.bounds.extents.x * Mathf.Abs(cartTitanVisual.localScale.x);
+                }
+                detachedPartners = true;
+            }
+
+            Vector3 crystalAnchorPosition = new Vector3(transform.position.x + 4.5f, GROUND_Y, 0f);
             if (crystalCore != null)
             {
                 crystalCore.transform.SetParent(null, true);
-                crystalCore.transform.position = new Vector3(transform.position.x + 4.5f, GROUND_Y, 0f);
-                crystalCore.transform.localScale = Vector3.one;
-                crystalCore.OnCoreDestroyed += HandleTetherBroken;
+                crystalCore.transform.localScale = Vector3.one * CrystalCore.ENLARGED_SCALE;
+                crystalCore.EnsureEnlargedScaleAndBounds();
+
+                float coreX = crystalAnchorPosition.x;
+                float crystalHalfWidth = crystalCore.GetWorldHalfWidth();
+                float requiredCartSeparation = crystalHalfWidth + cartHalfWidth + 0.25f;
+                float maxAllowedRight = mapMaxX - 0.5f;
+                if (cartTitanVisual != null && coreX + requiredCartSeparation + cartHalfWidth > maxAllowedRight)
+                {
+                    coreX = Mathf.Max(transform.position.x + 2.6f, maxAllowedRight - requiredCartSeparation - cartHalfWidth);
+                }
+
+                crystalAnchorPosition = new Vector3(coreX, crystalCore.GetGroundPlacementY(GROUND_Y), 0f);
+                crystalCore.transform.position = crystalAnchorPosition;
+                crystalCore.BindMainTitanBody(this);
+                crystalCore.RefreshProtectionState();
+                crystalCore.OnCoreDestroyed -= HandleCoreDestroyed;
+                crystalCore.OnCoreDestroyed += HandleCoreDestroyed;
                 detachedPartners = true;
             }
             if (tetherCable != null)
             {
                 tetherCable.transform.SetParent(null, true);
                 tetherCable.transform.localScale = Vector3.one;
-                tetherCable.OnCableSevered += HandleTetherBroken;
+                detachedPartners = true;
             }
             if (cartTitanVisual != null)
             {
-                cartTitanVisual.SetParent(null, true);
-                float coreX = crystalCore != null ? crystalCore.transform.position.x : transform.position.x + 4.5f;
-                cartTitanVisual.position = new Vector3(coreX + 0.4f, GROUND_Y, 0f);
-                cartTitanVisual.localScale = new Vector3(-Mathf.Abs(cartTitanVisual.localScale.x), Mathf.Abs(cartTitanVisual.localScale.y), 1f);
+                float coreX = crystalCore != null ? crystalCore.transform.position.x : crystalAnchorPosition.x;
+                float crystalHalfWidth = crystalCore != null ? crystalCore.GetWorldHalfWidth() : 1.32f;
+                float cartOffsetX = crystalHalfWidth + cartHalfWidth + 0.25f;
+                cartTitanVisual.position = new Vector3(coreX + cartOffsetX, GROUND_Y, 0f);
             }
 
+            UpdateTetherVisuals();
             nextCartFireTime = Time.time + 2.5f;
             NotifyStatusChanged("WAR HAMMER TETHER ACTIVE");
         }
 
         private void OnDestroy()
         {
-            if (crystalCore != null) crystalCore.OnCoreDestroyed -= HandleTetherBroken;
-            if (tetherCable != null) tetherCable.OnCableSevered -= HandleTetherBroken;
+            if (crystalCore != null) crystalCore.OnCoreDestroyed -= HandleCoreDestroyed;
             if (detachedPartners && !gameObject.scene.isLoaded) return;
             CleanupDetachedPartners();
         }
@@ -126,8 +166,8 @@ namespace StickmanBeatEmUp.Enemies
             tetherLine.enabled = show;
             if (!show) return;
 
-            Vector3 start = transform.position + new Vector3(0f, 0.7f, 0f);
-            Vector3 end = crystalCore.transform.position + new Vector3(0f, 0.6f, 0f);
+            Vector3 start = transform.position + new Vector3(0f, 0.9f, 0f);
+            Vector3 end = crystalCore.GetTetherAnchorWorldPosition();
             tetherLine.SetPosition(0, start);
             tetherLine.SetPosition(1, end);
 
@@ -238,7 +278,9 @@ namespace StickmanBeatEmUp.Enemies
             if (cartTurretProjectilePrefab == null) return;
             Vector3 pos = cartTurretFirePoint != null
                 ? cartTurretFirePoint.position
-                : (crystalCore != null ? crystalCore.transform.position + new Vector3(-0.9f, 0.8f, 0f) : transform.position + Vector3.right * 3f);
+                : (cartTitanVisual != null
+                    ? cartTitanVisual.position + new Vector3(-0.9f, 1.15f, 0f)
+                    : (crystalCore != null ? crystalCore.GetTetherAnchorWorldPosition() + new Vector3(1.5f, 0.2f, 0f) : transform.position + Vector3.right * 3f));
 
             Vector3 targetAim = playerTarget.position + Vector3.up * 0.85f;
             Vector2 dir = (targetAim - pos).normalized;
@@ -251,20 +293,37 @@ namespace StickmanBeatEmUp.Enemies
             }
         }
 
+        public override void TakeDamage(DamageData damageData)
+        {
+            if (IsDead || isDowned) return;
+            base.TakeDamage(damageData);
+        }
+
         protected override void OnHealthDepleted()
         {
-            if (!isTetherIntact)
+            if (crystalCore != null && !crystalCore.IsDead && crystalCore.CurrentHealth > 0f)
             {
-                DefeatBoss();
+                if (!isDowned)
+                {
+                    if (actionRoutine != null)
+                    {
+                        StopCoroutine(actionRoutine);
+                        actionRoutine = null;
+                    }
+                    isActing = false;
+                    DeactivateMeleeHitbox();
+                    if (!isFrozen && spriteRenderer != null && whiteFlashRoutine == null)
+                    {
+                        spriteRenderer.color = originalColor;
+                    }
+                    downedRoutine = StartCoroutine(DownedTetherReviveRoutine());
+                }
                 return;
             }
 
-            if (!isDowned)
+            if (crystalCore == null || crystalCore.IsDead)
             {
-                if (actionRoutine != null) StopCoroutine(actionRoutine);
-                isActing = false;
-                DeactivateMeleeHitbox();
-                downedRoutine = StartCoroutine(DownedTetherReviveRoutine());
+                DefeatBoss();
             }
         }
 
@@ -272,45 +331,60 @@ namespace StickmanBeatEmUp.Enemies
         {
             isDowned = true;
             isVulnerableStagger = true;
+            crystalCore?.RefreshProtectionState();
             StopHorizontalMovement();
             SetAnimState(2); // Kneel / Hit
-            NotifyStatusChanged("DOWNED! BREAK CRYSTAL CORE OR CABLE IN 5s!");
 
-            float elapsed = 0f;
-            while (elapsed < downedReviveDelay && isTetherIntact && !IsDead)
+            float remaining = downedReviveDelay;
+            int lastDisplayedSecond = -1;
+            while (remaining > 0f && crystalCore != null && !crystalCore.IsDead && !IsDead)
             {
-                elapsed += Time.deltaTime;
+                int sec = Mathf.CeilToInt(remaining);
+                if (sec != lastDisplayedSecond)
+                {
+                    lastDisplayedSecond = sec;
+                    NotifyStatusChanged($"TITAN DOWNED! BREAK CRYSTAL ({Mathf.CeilToInt(crystalCore != null ? crystalCore.CurrentHealth : 0f)}/500) - {Mathf.CeilToInt(remaining)}s!");
+                }
+                remaining -= Time.deltaTime;
                 yield return null;
             }
 
-            if (!isTetherIntact)
+            downedRoutine = null;
+            if (IsDead) yield break;
+
+            if (crystalCore == null || crystalCore.IsDead)
             {
                 DefeatBoss();
                 yield break;
             }
 
-            // Revive via glowing tether
+            // Revive to 100% full HP via intact CrystalCore tether
             isDowned = false;
             isVulnerableStagger = false;
-            CurrentHealth = MaxHealth * 0.5f;
+            CurrentHealth = MaxHealth;
             NotifyHealthChanged();
-            NotifyStatusChanged("TETHER REGENERATED WAR HAMMER TITAN!");
+            crystalCore?.RefreshProtectionState();
             SetAnimState(0);
+            nextAttackTime = Time.time + 0.8f;
+            NotifyStatusChanged("CRYSTAL INTACT! WAR HAMMER REVIVED FULL HP!");
         }
 
-        private void HandleTetherBroken()
+        private void HandleCoreDestroyed()
         {
-            if (!isTetherIntact || IsDead) return;
+            if (IsDead) return;
             isTetherIntact = false;
             if (tetherLine != null) tetherLine.enabled = false;
-            NotifyStatusChanged("TETHER SEVERED! NO MORE REGEN!");
-            CameraFollowBeatEmUp.Instance?.Shake(0.3f, 0.3f);
-
-            if (isDowned || CurrentHealth <= 0f)
+            if (downedRoutine != null)
             {
-                if (downedRoutine != null) StopCoroutine(downedRoutine);
-                DefeatBoss();
+                StopCoroutine(downedRoutine);
+                downedRoutine = null;
             }
+            isDowned = false;
+            CurrentHealth = 0f;
+            NotifyHealthChanged();
+            NotifyStatusChanged("CRYSTAL SHATTERED! WAR HAMMER DEFEATED!");
+            CameraFollowBeatEmUp.Instance?.Shake(0.35f, 0.35f);
+            DefeatBoss();
         }
     }
 }

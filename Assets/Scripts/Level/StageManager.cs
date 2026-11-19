@@ -152,7 +152,59 @@ namespace StickmanBeatEmUp.Level
                 }
             }
 
-            Color groundColor = level != null ? level.groundColor : new Color(0.22f, 0.21f, 0.19f, 1f);
+            // Determine bright, visible world arena ground base and blend with level.groundColor,
+            // clamping luminance into [0.52, 0.72] so dark stickmen stay clearly readable.
+            Color worldGroundBase;
+            if (level != null)
+            {
+                switch (level.worldType)
+                {
+                    case WorldType.World2_Wasteland:
+                        worldGroundBase = new Color(0.73f, 0.63f, 0.50f, 1f);
+                        break;
+                    case WorldType.World3_NeoCity:
+                        worldGroundBase = new Color(0.55f, 0.59f, 0.68f, 1f);
+                        break;
+                    default:
+                        // World1_RuinedCity
+                        worldGroundBase = new Color(0.68f, 0.64f, 0.58f, 1f);
+                        break;
+                }
+            }
+            else
+            {
+                worldGroundBase = new Color(0.68f, 0.64f, 0.58f, 1f);
+            }
+
+            Color levelGround = level != null ? level.groundColor : worldGroundBase;
+            Color groundColor = Color.Lerp(worldGroundBase, levelGround, 0.20f);
+            float gLum = 0.2126f * groundColor.r + 0.7152f * groundColor.g + 0.0722f * groundColor.b;
+            if (gLum < 0.52f)
+            {
+                if (gLum > 0.0001f)
+                {
+                    float scale = 0.52f / gLum;
+                    groundColor = new Color(
+                        Mathf.Clamp01(groundColor.r * scale),
+                        Mathf.Clamp01(groundColor.g * scale),
+                        Mathf.Clamp01(groundColor.b * scale),
+                        1f);
+                }
+                else
+                {
+                    groundColor = worldGroundBase;
+                }
+            }
+            else if (gLum > 0.72f)
+            {
+                float scale = 0.72f / gLum;
+                groundColor = new Color(groundColor.r * scale, groundColor.g * scale, groundColor.b * scale, 1f);
+            }
+            else
+            {
+                groundColor.a = 1f;
+            }
+
             if (groundRenderer != null)
             {
                 groundRenderer.enabled = true;
@@ -165,6 +217,11 @@ namespace StickmanBeatEmUp.Level
             {
                 mainCam.backgroundColor = Color.Lerp(groundColor, Color.white, 0.25f);
             }
+
+            // --- MapParallaxController — called AFTER EnsureGroundArenaCoverage has sized groundRenderer ---
+            MapParallaxController parallax = GetComponent<MapParallaxController>();
+            if (parallax == null) parallax = gameObject.AddComponent<MapParallaxController>();
+            parallax.Setup(level, backgroundRenderer, groundRenderer);
         }
 
         private static void EnsureGroundArenaCoverage(Transform groundTransform, float minWidth, float centerX, float groundY)

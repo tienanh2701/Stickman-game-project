@@ -35,6 +35,14 @@ namespace StickmanBeatEmUp.Environment
         private float nextReadyTime;
         private GameObject activeCannonball;
 
+        public static bool IsApplyingArtilleryDamage { get; private set; }
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetArtilleryStatics()
+        {
+            IsApplyingArtilleryDamage = false;
+        }
+
         public Transform Transform => transform;
         public bool IsDead => Time.time < nextReadyTime || !CampaignHazardSpawner.CanHazardOperate();
 
@@ -201,22 +209,30 @@ namespace StickmanBeatEmUp.Environment
                 Vector2 boxCenter = new Vector2(pos.x, (minSweepY + maxSweepY) * 0.5f);
                 Vector2 boxSize = new Vector2(sweepRadius * 1.6f, Mathf.Max(1.5f, maxSweepY - minSweepY));
                 Collider2D[] overlaps = Physics2D.OverlapBoxAll(boxCenter, boxSize, 0f);
-                for (int i = 0; i < overlaps.Length; i++)
+                IsApplyingArtilleryDamage = true;
+                try
                 {
-                    Collider2D hit = overlaps[i];
-                    if (hit == null || hit.gameObject == gameObject) continue;
-
-                    if (CampaignHazardSpawner.TryResolveEnemyDamageable(hit, out IDamageable target) && !hitTargets.Contains(target))
+                    for (int i = 0; i < overlaps.Length; i++)
                     {
-                        hitTargets.Add(target);
-                        target.TakeDamage(new DamageData(
-                            cannonDamage,
-                            new Vector2(fireDirection * 9f, 3.5f),
-                            AttackType.Combo_DashI,
-                            true,
-                            creditAttacker
-                        ));
+                        Collider2D hit = overlaps[i];
+                        if (hit == null || hit.gameObject == gameObject) continue;
+
+                        if (CampaignHazardSpawner.TryResolveEnemyDamageable(hit, out IDamageable target) && !hitTargets.Contains(target))
+                        {
+                            hitTargets.Add(target);
+                            target.TakeDamage(new DamageData(
+                                cannonDamage,
+                                new Vector2(fireDirection * 9f, 3.5f),
+                                AttackType.Combo_DashI,
+                                true,
+                                creditAttacker
+                            ));
+                        }
                     }
+                }
+                finally
+                {
+                    IsApplyingArtilleryDamage = false;
                 }
 
                 if ((fireDirection > 0 && pos.x >= targetEdgeX) || (fireDirection < 0 && pos.x <= targetEdgeX))
