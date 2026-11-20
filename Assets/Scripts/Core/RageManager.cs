@@ -1,49 +1,99 @@
 using System;
 using UnityEngine;
+using StickmanBeatEmUp.CorePure.Entities.Combat;
+using StickmanBeatEmUp.CorePure.Rules.Combat;
 
 namespace StickmanBeatEmUp.Core
 {
     /// <summary>
-    /// Quản lý cơ chế Tích Nộ (Rage System):
+    /// Unity Adapter mỏng quản lý cơ chế Tích Nộ (Rage System), ủy quyền toàn bộ luật sang RageRuleEngine (CorePure):
     /// - Tối đa 30 điểm (3 mốc, mỗi mốc 10 điểm)
-    /// - Đánh trúng bằng J hoặc U: +1 điểm nộ
-    /// - Kỹ năng U: 0 nộ
-    /// - Kỹ năng I: 10 nộ (1 mốc)
-    /// - Biến hình (Transform): 30 nộ (đầy cả 3 mốc)
-    /// - Combo Đặc Biệt (Dash + I): Phải biến hình & Đầy 30 nộ
+    /// - Đánh trúng bằng J, U hoặc Dash+J: +1.5 điểm nộ (hoặc theo cấu hình nhân vật)
+    /// - Kỹ năng U: 0 nộ | Kỹ năng I: 10 nộ | Biến hình: 30 nộ | Combo Đặc Biệt (Dash + I): Biến hình & 30 nộ
     /// </summary>
     public class RageManager : MonoBehaviour
     {
-        public const int MAX_RAGE = 30;
-        public const int RAGE_PER_SEGMENT = 10;
-        public const int SKILL_I_COST = 10;
-        public const int TRANSFORM_COST = 30;
-        public const int SPECIAL_COMBO_COST = 30;
-        public const float RAGE_PER_HIT = 1.5f;
-        public const float RAGE_PER_KILL = 2.0f;
+        public const int MAX_RAGE = RageRuleEngine.MAX_RAGE;
+        public const int RAGE_PER_SEGMENT = RageRuleEngine.RAGE_PER_SEGMENT;
+        public const int SKILL_I_COST = RageRuleEngine.SKILL_I_COST;
+        public const int TRANSFORM_COST = RageRuleEngine.TRANSFORM_COST;
+        public const int SPECIAL_COMBO_COST = RageRuleEngine.SPECIAL_COMBO_COST;
+        public const float RAGE_PER_HIT = RageRuleEngine.RAGE_PER_HIT;
+        public const float RAGE_PER_KILL = RageRuleEngine.RAGE_PER_KILL;
 
         [Header("Runtime State")]
         [SerializeField] private int currentRage = 0;
-        private float currentRageExact = 0f;
+
+        private RageRuleEngine ruleEngine;
 
         // Sự kiện thông báo thay đổi Nộ cho UI và FX
         public event Action<int, int> OnRageChanged; // (current, max)
         public event Action<int> OnSegmentFilled;     // (segmentIndex: 1, 2, 3)
 
-        public int CurrentRage => currentRage;
-        public float CurrentRageFloat => currentRageExact;
-        public bool IsMaxRage => currentRageExact >= MAX_RAGE;
-        public int FilledSegments => Mathf.FloorToInt(currentRageExact) / RAGE_PER_SEGMENT;
+        public RageRuleEngine RuleEngine => EnsureRuleEngine();
+        public int CurrentRage => EnsureRuleEngine().CurrentRage;
+        public float CurrentRageFloat => EnsureRuleEngine().CurrentRageFloat;
+        public bool IsMaxRage => EnsureRuleEngine().IsMaxRage;
+        public int FilledSegments => EnsureRuleEngine().FilledSegments;
+
+        private RageRuleEngine EnsureRuleEngine()
+        {
+            if (ruleEngine == null)
+            {
+                ruleEngine = new RageRuleEngine();
+                ruleEngine.OnRageChanged += HandleEngineRageChanged;
+                ruleEngine.OnSegmentFilled += HandleEngineSegmentFilled;
+            }
+            return ruleEngine;
+        }
 
         private void Awake()
         {
-            currentRageExact = 0f;
+            RageRuleEngine engine = EnsureRuleEngine();
+            engine.SetRageExact(0f, notify: false);
             currentRage = 0;
         }
 
         private void Start()
         {
+            currentRage = EnsureRuleEngine().CurrentRage;
             OnRageChanged?.Invoke(currentRage, MAX_RAGE);
+        }
+
+        private void OnDestroy()
+        {
+            if (ruleEngine != null)
+            {
+                ruleEngine.OnRageChanged -= HandleEngineRageChanged;
+                ruleEngine.OnSegmentFilled -= HandleEngineSegmentFilled;
+            }
+        }
+
+        private void HandleEngineRageChanged(int current, int max)
+        {
+            currentRage = current;
+            OnRageChanged?.Invoke(current, max);
+        }
+
+        private void HandleEngineSegmentFilled(int segmentIndex)
+        {
+            OnSegmentFilled?.Invoke(segmentIndex);
+        }
+
+        private static CombatAttackKind ToCombatAttackKind(AttackType attackType)
+        {
+            switch (attackType)
+            {
+                case AttackType.NormalAttack_J: return CombatAttackKind.NormalAttackJ;
+                case AttackType.Skill_U: return CombatAttackKind.SkillU;
+                case AttackType.Skill_I: return CombatAttackKind.SkillI;
+                case AttackType.Combo_DashJ: return CombatAttackKind.ComboDashJ;
+                case AttackType.Combo_DashI: return CombatAttackKind.ComboDashI;
+                case AttackType.TransformBurst: return CombatAttackKind.TransformBurst;
+                case AttackType.EnemyAttack: return CombatAttackKind.EnemyAttack;
+                case AttackType.EnemyHeavyAttack: return CombatAttackKind.EnemyHeavyAttack;
+                default: return CombatAttackKind.NormalAttackJ;
+            }
         }
 
         /// <summary>
@@ -51,7 +101,7 @@ namespace StickmanBeatEmUp.Core
         /// </summary>
         public void AddRageFromHit(AttackType attackType)
         {
-            AddRageFromHit(attackType, RAGE_PER_HIT);
+            EnsureRuleEngine().AddRageFromHit(ToCombatAttackKind(attackType));
         }
 
         /// <summary>
@@ -59,12 +109,7 @@ namespace StickmanBeatEmUp.Core
         /// </summary>
         public void AddRageFromHit(AttackType attackType, float hitRageAmount)
         {
-            if (attackType == AttackType.NormalAttack_J ||
-                attackType == AttackType.Skill_U ||
-                attackType == AttackType.Combo_DashJ)
-            {
-                AddRageFloat(hitRageAmount);
-            }
+            EnsureRuleEngine().AddRageFromHit(ToCombatAttackKind(attackType), hitRageAmount);
         }
 
         /// <summary>
@@ -72,7 +117,7 @@ namespace StickmanBeatEmUp.Core
         /// </summary>
         public void AddRageFromKill()
         {
-            AddRageFloat(RAGE_PER_KILL);
+            EnsureRuleEngine().AddRageFromKill();
         }
 
         /// <summary>
@@ -80,22 +125,7 @@ namespace StickmanBeatEmUp.Core
         /// </summary>
         public void AddRageFloat(float amount)
         {
-            if (amount <= 0f || currentRageExact >= MAX_RAGE) return;
-
-            int prevSegments = FilledSegments;
-            currentRageExact = Mathf.Clamp(currentRageExact + amount, 0f, MAX_RAGE);
-            currentRage = Mathf.FloorToInt(currentRageExact);
-
-            OnRageChanged?.Invoke(currentRage, MAX_RAGE);
-
-            int newSegments = FilledSegments;
-            if (newSegments > prevSegments)
-            {
-                for (int i = prevSegments + 1; i <= newSegments; i++)
-                {
-                    OnSegmentFilled?.Invoke(i);
-                }
-            }
+            EnsureRuleEngine().AddRageFloat(amount);
         }
 
         /// <summary>
@@ -103,7 +133,7 @@ namespace StickmanBeatEmUp.Core
         /// </summary>
         public void AddRage(int amount)
         {
-            AddRageFloat(amount);
+            EnsureRuleEngine().AddRage(amount);
         }
 
         /// <summary>
@@ -111,7 +141,7 @@ namespace StickmanBeatEmUp.Core
         /// </summary>
         public bool CanUseSkillI()
         {
-            return currentRage >= SKILL_I_COST;
+            return EnsureRuleEngine().CanUseSkillI();
         }
 
         /// <summary>
@@ -119,7 +149,7 @@ namespace StickmanBeatEmUp.Core
         /// </summary>
         public bool CanTransform()
         {
-            return currentRage >= TRANSFORM_COST;
+            return EnsureRuleEngine().CanTransform();
         }
 
         /// <summary>
@@ -127,7 +157,7 @@ namespace StickmanBeatEmUp.Core
         /// </summary>
         public bool CanUseSpecialCombo(bool isTransformed)
         {
-            return isTransformed && currentRage >= SPECIAL_COMBO_COST;
+            return EnsureRuleEngine().CanUseSpecialCombo(isTransformed);
         }
 
         /// <summary>
@@ -135,14 +165,7 @@ namespace StickmanBeatEmUp.Core
         /// </summary>
         public bool TryConsumeRage(int amount)
         {
-            if (currentRageExact >= amount)
-            {
-                currentRageExact = Mathf.Clamp(currentRageExact - amount, 0f, MAX_RAGE);
-                currentRage = Mathf.FloorToInt(currentRageExact);
-                OnRageChanged?.Invoke(currentRage, MAX_RAGE);
-                return true;
-            }
-            return false;
+            return EnsureRuleEngine().TryConsumeRage(amount);
         }
 
         /// <summary>
@@ -150,14 +173,7 @@ namespace StickmanBeatEmUp.Core
         /// </summary>
         public void FillMaxRage()
         {
-            int prevSegments = FilledSegments;
-            currentRageExact = MAX_RAGE;
-            currentRage = MAX_RAGE;
-            OnRageChanged?.Invoke(currentRage, MAX_RAGE);
-            for (int i = prevSegments + 1; i <= 3; i++)
-            {
-                OnSegmentFilled?.Invoke(i);
-            }
+            EnsureRuleEngine().FillMaxRage();
         }
 
         /// <summary>
@@ -165,9 +181,7 @@ namespace StickmanBeatEmUp.Core
         /// </summary>
         public void ResetRage()
         {
-            currentRageExact = 0f;
-            currentRage = 0;
-            OnRageChanged?.Invoke(currentRage, MAX_RAGE);
+            EnsureRuleEngine().ResetRage();
         }
 
 #if UNITY_EDITOR

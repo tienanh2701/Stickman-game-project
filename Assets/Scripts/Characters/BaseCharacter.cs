@@ -2,10 +2,10 @@ using System;
 using System.Collections;
 using System.IO;
 using UnityEngine;
-#if ENABLE_INPUT_SYSTEM
-using UnityEngine.InputSystem;
-#endif
 using StickmanBeatEmUp.Core;
+using StickmanBeatEmUp.CorePure.Entities.Combat;
+using StickmanBeatEmUp.CorePure.Interfaces;
+using StickmanBeatEmUp.CorePure.Rules.Combat;
 using StickmanBeatEmUp.Characters.Stats;
 using StickmanBeatEmUp.GameModes;
 using StickmanBeatEmUp.Level;
@@ -74,6 +74,10 @@ namespace StickmanBeatEmUp.Characters
         protected Collider2D col;
         protected InputHandler inputHandler;
         protected RageManager rageManager;
+        private IInputProvider inputProvider;
+        private IInputProvider subscribedInputProvider;
+        private bool isInputSubscribed = false;
+        private IStatSource statSource = BaseStatSource.Default;
 
         // FSM & Combat State
         protected CharacterState currentState = CharacterState.Idle;
@@ -127,6 +131,37 @@ namespace StickmanBeatEmUp.Characters
         public float MaxHealth => stats != null ? stats.maxHealth : 100f;
         public RageManager RageManager => rageManager;
         public RageManager RageManagerRef => rageManager;
+        public IInputProvider InputProvider => inputProvider ?? inputHandler;
+        public IStatSource StatSource => statSource ?? BaseStatSource.Default;
+
+        public void SetInputProvider(IInputProvider provider)
+        {
+            IInputProvider nextProvider = provider ?? inputHandler;
+            if (ReferenceEquals(inputProvider, nextProvider)) return;
+
+            bool wasSubscribed = isInputSubscribed;
+            if (wasSubscribed)
+            {
+                UnsubscribeInputProvider();
+            }
+
+            inputProvider = nextProvider;
+
+            if (wasSubscribed)
+            {
+                SubscribeInputProvider();
+            }
+        }
+
+        public void SetStatSource(IStatSource source)
+        {
+            statSource = source ?? BaseStatSource.Default;
+        }
+
+        public void ResetStatSource()
+        {
+            statSource = BaseStatSource.Default;
+        }
 
         public bool IsBlocking => currentState == CharacterState.Block && blockTimer > 0f;
         public float BlockCooldownRemaining => Mathf.Max(0f, (lastBlockTime + blockCooldown) - Time.time);
@@ -136,8 +171,8 @@ namespace StickmanBeatEmUp.Characters
         public bool TrainingInvincible { get; set; }
         public int FacingDirection => facingDirection;
 
-        public float OutgoingDamageMultiplier => ultraWaterTimer > 0f ? ultraWaterDamageMultiplier : 1f;
-        public float GetModifiedDamage(float rawDamage) => rawDamage * OutgoingDamageMultiplier;
+        public float OutgoingDamageMultiplier => StatSource.AttackDamageMultiplier * (ultraWaterTimer > 0f ? ultraWaterDamageMultiplier : 1f);
+        public float GetModifiedDamage(float rawDamage) => DamageCalculator.CalculateOutgoingDamage(rawDamage, StatSource, ultraWaterTimer > 0f ? ultraWaterDamageMultiplier : 1f);
         public bool HasSpinalFluidBuff => spinalFluidTimer > 0f && virtualShieldHp > 0f;
         public bool HasUltraWaterBuff => ultraWaterTimer > 0f;
         public float VirtualShieldHP => virtualShieldHp;
@@ -191,6 +226,10 @@ namespace StickmanBeatEmUp.Characters
             rb = GetComponent<Rigidbody2D>();
             col = GetComponent<Collider2D>();
             inputHandler = GetComponent<InputHandler>();
+            if (inputProvider == null)
+            {
+                inputProvider = inputHandler;
+            }
             rageManager = GetComponent<RageManager>();
 
             if (spriteRenderer == null)
@@ -341,33 +380,52 @@ namespace StickmanBeatEmUp.Characters
             }
             OnHealthChanged?.Invoke(currentHealth, stats != null ? stats.maxHealth : 100f);
 
-            // Đăng ký sự kiện từ InputHandler
-            inputHandler.OnMoveEvent += HandleMoveInput;
-            inputHandler.OnJumpEvent += HandleJumpInput;
-            inputHandler.OnDashEvent += HandleDashInput;
-            inputHandler.OnAttackEvent += HandleAttackInput;
-            inputHandler.OnSkill1Event += HandleSkill1Input;
-            inputHandler.OnSkill2Event += HandleSkill2Input;
-            inputHandler.OnTransformEvent += HandleTransformInput;
-            inputHandler.OnBlockEvent += HandleBlockInput;
+            // Đăng ký sự kiện từ IInputProvider (mặc định là InputHandler)
+            SubscribeInputProvider();
 
             ChangeState(CharacterState.Idle);
             FindCameraWalls();
         }
 
+        private void SubscribeInputProvider()
+        {
+            IInputProvider provider = InputProvider;
+            if (provider == null) return;
+            if (isInputSubscribed && ReferenceEquals(subscribedInputProvider, provider)) return;
+
+            UnsubscribeInputProvider();
+            provider.OnMoveEvent += HandleMoveInput;
+            provider.OnJumpEvent += HandleJumpInput;
+            provider.OnDashEvent += HandleDashInput;
+            provider.OnAttackEvent += HandleAttackInput;
+            provider.OnSkill1Event += HandleSkill1Input;
+            provider.OnSkill2Event += HandleSkill2Input;
+            provider.OnTransformEvent += HandleTransformInput;
+            provider.OnBlockEvent += HandleBlockInput;
+            subscribedInputProvider = provider;
+            isInputSubscribed = true;
+        }
+
+        private void UnsubscribeInputProvider()
+        {
+            if (subscribedInputProvider != null)
+            {
+                subscribedInputProvider.OnMoveEvent -= HandleMoveInput;
+                subscribedInputProvider.OnJumpEvent -= HandleJumpInput;
+                subscribedInputProvider.OnDashEvent -= HandleDashInput;
+                subscribedInputProvider.OnAttackEvent -= HandleAttackInput;
+                subscribedInputProvider.OnSkill1Event -= HandleSkill1Input;
+                subscribedInputProvider.OnSkill2Event -= HandleSkill2Input;
+                subscribedInputProvider.OnTransformEvent -= HandleTransformInput;
+                subscribedInputProvider.OnBlockEvent -= HandleBlockInput;
+                subscribedInputProvider = null;
+            }
+            isInputSubscribed = false;
+        }
+
         protected virtual void OnDestroy()
         {
-            if (inputHandler != null)
-            {
-                inputHandler.OnMoveEvent -= HandleMoveInput;
-                inputHandler.OnJumpEvent -= HandleJumpInput;
-                inputHandler.OnDashEvent -= HandleDashInput;
-                inputHandler.OnAttackEvent -= HandleAttackInput;
-                inputHandler.OnSkill1Event -= HandleSkill1Input;
-                inputHandler.OnSkill2Event -= HandleSkill2Input;
-                inputHandler.OnTransformEvent -= HandleTransformInput;
-                inputHandler.OnBlockEvent -= HandleBlockInput;
-            }
+            UnsubscribeInputProvider();
         }
 
         protected virtual void Update()
@@ -449,10 +507,45 @@ namespace StickmanBeatEmUp.Characters
         #endregion
 
         #region FSM Management
+        protected static CombatActorState ToCombatActorState(CharacterState state)
+        {
+            switch (state)
+            {
+                case CharacterState.Idle: return CombatActorState.Idle;
+                case CharacterState.Run: return CombatActorState.Run;
+                case CharacterState.Dash: return CombatActorState.Dash;
+                case CharacterState.Attack: return CombatActorState.Attack;
+                case CharacterState.Skill: return CombatActorState.Skill;
+                case CharacterState.Transform: return CombatActorState.Transform;
+                case CharacterState.Hurt: return CombatActorState.Hurt;
+                case CharacterState.Dead: return CombatActorState.Dead;
+                case CharacterState.Block: return CombatActorState.Block;
+                default: return CombatActorState.Idle;
+            }
+        }
+
+        protected static CombatAttackKind ToCombatAttackKind(AttackType attackType)
+        {
+            switch (attackType)
+            {
+                case AttackType.NormalAttack_J: return CombatAttackKind.NormalAttackJ;
+                case AttackType.Skill_U: return CombatAttackKind.SkillU;
+                case AttackType.Skill_I: return CombatAttackKind.SkillI;
+                case AttackType.Combo_DashJ: return CombatAttackKind.ComboDashJ;
+                case AttackType.Combo_DashI: return CombatAttackKind.ComboDashI;
+                case AttackType.TransformBurst: return CombatAttackKind.TransformBurst;
+                case AttackType.EnemyAttack: return CombatAttackKind.EnemyAttack;
+                case AttackType.EnemyHeavyAttack: return CombatAttackKind.EnemyHeavyAttack;
+                default: return CombatAttackKind.EnemyAttack;
+            }
+        }
+
         public virtual void ChangeState(CharacterState newState)
         {
-            if (currentState == CharacterState.Dead) return;
-            if (currentState == newState) return;
+            if (!CombatRuleGuard.CanTransition(ToCombatActorState(currentState), ToCombatActorState(newState)))
+            {
+                return;
+            }
 
             ExitCurrentState(currentState);
             currentState = newState;
@@ -603,7 +696,8 @@ namespace StickmanBeatEmUp.Characters
                     break;
                 case CharacterState.Dead:
                     rb.linearVelocity = Vector2.zero;
-                    inputHandler.IsInputBlocked = true;
+                    IInputProvider deadInput = InputProvider;
+                    if (deadInput != null) deadInput.IsInputBlocked = true;
                     if (dashTrail != null) dashTrail.emitting = false;
                     if (blockShieldVisual != null) blockShieldVisual.gameObject.SetActive(false);
                     break;
@@ -652,9 +746,10 @@ namespace StickmanBeatEmUp.Characters
             }
 
             // Chuyển đổi trạng thái tự động giữa Idle và Run nếu không bị khóa hành động
-            if (currentState == CharacterState.Idle || currentState == CharacterState.Run)
+            if (CombatRuleGuard.CanPerformAction(ToCombatActorState(currentState), CombatActionType.Move))
             {
-                float h = inputHandler.HorizontalInput;
+                IInputProvider activeInput = InputProvider;
+                float h = activeInput != null ? activeInput.HorizontalInput : 0f;
                 if (Mathf.Abs(h) > 0.05f)
                 {
                     if (currentState != CharacterState.Run) ChangeState(CharacterState.Run);
@@ -710,6 +805,12 @@ namespace StickmanBeatEmUp.Characters
                     ultraWaterSpeedMultiplier = 1f;
                     ultraWaterRagePerSec = 0f;
                 }
+            }
+
+            float statRageBonus = StatSource.RagePerSecondBonus;
+            if (statRageBonus > 0f)
+            {
+                rageManager?.AddRageFloat(statRageBonus * Time.deltaTime);
             }
 
             if (hazardSlowTimer > 0f)
@@ -819,11 +920,11 @@ namespace StickmanBeatEmUp.Characters
         #endregion
 
         #region Movement & Dash Mechanics
-        protected virtual float GetCustomSpeedMultiplier() => ultraWaterSpeedMultiplier * hazardSpeedMultiplier;
+        protected virtual float GetCustomSpeedMultiplier() => StatSource.MoveSpeedMultiplier * ultraWaterSpeedMultiplier * hazardSpeedMultiplier;
 
         protected virtual void Move(float horizontal)
         {
-            if (currentState != CharacterState.Run && currentState != CharacterState.Idle) return;
+            if (!CombatRuleGuard.CanPerformAction(ToCombatActorState(currentState), CombatActionType.Move)) return;
 
             float speed = stats != null ? stats.moveSpeed : 6f;
             if (isTransformed && stats != null) speed *= stats.transformSpeedMultiplier;
@@ -855,21 +956,23 @@ namespace StickmanBeatEmUp.Characters
             // Được xử lý trong UpdateFSM để giữ tính mượt mà
         }
 
-        private static bool IsDropModifierHeld()
+        protected bool IsDropModifierHeld()
         {
-#if ENABLE_INPUT_SYSTEM
-            Keyboard kb = Keyboard.current;
-            return kb != null && (kb.sKey.isPressed || kb.sKey.wasPressedThisFrame || kb.downArrowKey.isPressed || kb.downArrowKey.wasPressedThisFrame);
-#else
-            return Input.GetKey(KeyCode.S) || Input.GetKeyDown(KeyCode.S) || Input.GetKey(KeyCode.DownArrow) || Input.GetKeyDown(KeyCode.DownArrow);
-#endif
+            IInputProvider activeInput = InputProvider;
+            return activeInput != null && activeInput.IsDropModifierHeld;
         }
 
         protected virtual void HandleJumpInput()
         {
-            if (currentState == CharacterState.Dead || currentState == CharacterState.Hurt ||
-                currentState == CharacterState.Transform || currentState == CharacterState.Block ||
-                IsBlocking || IsDropModifierHeld()) return;
+            if (!CombatRuleGuard.CanPerformAction(
+                ToCombatActorState(currentState),
+                CombatActionType.Jump,
+                IsBlocking,
+                isTransformed,
+                IsDropModifierHeld()))
+            {
+                return;
+            }
 
             if (isGrounded)
             {
@@ -883,12 +986,15 @@ namespace StickmanBeatEmUp.Characters
         /// </summary>
         protected virtual void HandleDashInput(float direction)
         {
-            if (currentState == CharacterState.Dead || currentState == CharacterState.Hurt ||
-                currentState == CharacterState.Transform || currentState == CharacterState.Dash ||
-                currentState == CharacterState.Block || IsBlocking) return;
-
             float cooldown = stats != null ? stats.dashCooldown : 0.5f;
-            if (Time.time - lastDashEndTime < cooldown) return;
+            if (!CombatRuleGuard.CanPerformDash(
+                ToCombatActorState(currentState),
+                Time.time - lastDashEndTime,
+                cooldown,
+                IsBlocking))
+            {
+                return;
+            }
 
             // Đồng bộ hướng dash nếu người chơi bấm ngược hướng nhìn
             int dashDir = direction > 0 ? 1 : -1;
@@ -948,16 +1054,13 @@ namespace StickmanBeatEmUp.Characters
         /// </summary>
         protected virtual void HandleAttackInput()
         {
-            if (currentState == CharacterState.Dead || currentState == CharacterState.Hurt ||
-                currentState == CharacterState.Transform || currentState == CharacterState.Block ||
-                IsBlocking) return;
-
-            if (currentState == CharacterState.Dash)
+            CombatActorState state = ToCombatActorState(currentState);
+            if (CombatRuleGuard.CanPerformAction(state, CombatActionType.DashAttackCombo, IsBlocking))
             {
                 // COMBO CƠ BẢN: Dash + J
                 ExecuteDashAttackCombo();
             }
-            else if (currentState == CharacterState.Idle || currentState == CharacterState.Run)
+            else if (CombatRuleGuard.CanPerformAction(state, CombatActionType.NormalAttack, IsBlocking))
             {
                 // ĐÁNH THƯỜNG J
                 ExecuteNormalAttack();
@@ -969,10 +1072,8 @@ namespace StickmanBeatEmUp.Characters
         /// </summary>
         protected virtual void HandleSkill1Input()
         {
-            if (currentState == CharacterState.Dead || currentState == CharacterState.Hurt ||
-                currentState == CharacterState.Transform || currentState == CharacterState.Block ||
-                IsBlocking) return;
-            if (currentState == CharacterState.Idle || currentState == CharacterState.Run)
+            CombatActorState state = ToCombatActorState(currentState);
+            if (CombatRuleGuard.CanPerformAction(state, CombatActionType.Skill1, IsBlocking))
             {
                 ExecuteSkill1();
             }
@@ -985,27 +1086,25 @@ namespace StickmanBeatEmUp.Characters
         /// </summary>
         protected virtual void HandleSkill2Input()
         {
-            if (currentState == CharacterState.Dead || currentState == CharacterState.Hurt ||
-                currentState == CharacterState.Transform || currentState == CharacterState.Block ||
-                IsBlocking) return;
-
-            if (currentState == CharacterState.Dash)
+            CombatActorState state = ToCombatActorState(currentState);
+            if (CombatRuleGuard.CanPerformAction(state, CombatActionType.SpecialCombo, IsBlocking))
             {
                 // COMBO ĐẶC BIỆT: Dash + I (Yêu cầu: Đã biến hình + Đầy 30 nộ)
-                if (rageManager.CanUseSpecialCombo(isTransformed))
+                if (rageManager != null && CombatRuleGuard.CanExecuteSkillWithRage(state, CombatActionType.SpecialCombo, rageManager.RuleEngine, isTransformed, IsBlocking))
                 {
                     rageManager.TryConsumeRage(RageManager.SPECIAL_COMBO_COST);
                     ExecuteSpecialCombo();
                 }
                 else
                 {
-                    Debug.Log($"<color=yellow>[Combo Đặc Biệt Locked]</color> Cần: Biến Hình ({isTransformed}) & Đầy 30 Nộ (Hiện tại: {rageManager.CurrentRage}/30)");
+                    int currentRage = rageManager != null ? rageManager.CurrentRage : 0;
+                    Debug.Log($"<color=yellow>[Combo Đặc Biệt Locked]</color> Cần: Biến Hình ({isTransformed}) & Đầy 30 Nộ (Hiện tại: {currentRage}/30)");
                 }
             }
-            else if (currentState == CharacterState.Idle || currentState == CharacterState.Run)
+            else if (CombatRuleGuard.CanPerformAction(state, CombatActionType.Skill2, IsBlocking))
             {
                 // KỸ NĂNG 2: Tốn 10 Nộ
-                if (rageManager.CanUseSkillI())
+                if (rageManager != null && CombatRuleGuard.CanExecuteSkillWithRage(state, CombatActionType.Skill2, rageManager.RuleEngine, isTransformed, IsBlocking))
                 {
                     rageManager.TryConsumeRage(RageManager.SKILL_I_COST);
                     ExecuteSkill2();
@@ -1022,18 +1121,21 @@ namespace StickmanBeatEmUp.Characters
         /// </summary>
         protected virtual void HandleTransformInput()
         {
-            if (currentState == CharacterState.Dead || currentState == CharacterState.Hurt ||
-                currentState == CharacterState.Block || IsBlocking || currentState == CharacterState.Transform ||
-                isTransformed) return;
+            CombatActorState state = ToCombatActorState(currentState);
+            if (!CombatRuleGuard.CanPerformAction(state, CombatActionType.Transform, IsBlocking, isTransformed))
+            {
+                return;
+            }
 
-            if (rageManager.CanTransform())
+            if (rageManager != null && CombatRuleGuard.CanExecuteSkillWithRage(state, CombatActionType.Transform, rageManager.RuleEngine, isTransformed, IsBlocking))
             {
                 rageManager.TryConsumeRage(RageManager.TRANSFORM_COST);
                 ExecuteTransform();
             }
             else
             {
-                Debug.Log($"<color=yellow>[Transform Locked]</color> Cần 30 nộ để biến hình! Hiện tại: {rageManager.CurrentRage}/30");
+                int currentRage = rageManager != null ? rageManager.CurrentRage : 0;
+                Debug.Log($"<color=yellow>[Transform Locked]</color> Cần 30 nộ để biến hình! Hiện tại: {currentRage}/30");
             }
         }
 
@@ -1042,17 +1144,10 @@ namespace StickmanBeatEmUp.Characters
         /// </summary>
         protected virtual void HandleBlockInput()
         {
-            if (currentState == CharacterState.Dead ||
-                currentState == CharacterState.Hurt ||
-                currentState == CharacterState.Dash ||
-                currentState == CharacterState.Transform ||
-                currentState == CharacterState.Skill ||
-                currentState == CharacterState.Block)
+            if (!CombatRuleGuard.CanPerformBlock(ToCombatActorState(currentState), Time.time - lastBlockTime, blockCooldown))
             {
                 return;
             }
-
-            if (Time.time < lastBlockTime + blockCooldown) return;
 
             lastBlockTime = Time.time;
             blockTimer = blockDuration;
@@ -1167,10 +1262,37 @@ namespace StickmanBeatEmUp.Characters
 
         public virtual void TakeDamage(DamageData damageData)
         {
-            if (IsDead || TrainingInvincible || isInvulnerable || isTrainingRespawnInvulnerable) return;
+            bool hasAttacker = damageData.attacker != null;
+            float attackerDistance = hasAttacker
+                ? Vector2.Distance(transform.position, damageData.attacker.transform.position)
+                : float.PositiveInfinity;
 
-            float incomingDamage = Mathf.Max(0f, damageData.damageAmount);
-            bool blocking = IsBlocking;
+            CombatDamageInput damageInput = new CombatDamageInput
+            {
+                RawDamage = damageData.damageAmount,
+                CurrentHealth = currentHealth,
+                MaxHealth = MaxHealth,
+                CurrentVirtualShield = virtualShieldHp,
+                BlockDamageMultiplier = blockDamageMultiplier,
+                BonusReflectDamage = spinalReflectDamage,
+                IsDead = IsDead,
+                IsInvulnerable = TrainingInvincible || isInvulnerable || isTrainingRespawnInvulnerable,
+                IsBlocking = IsBlocking,
+                IsStunImmune = Time.time < stunImmunityUntilTime,
+                IsSkillActive = CurrentState == CharacterState.Skill,
+                IsTransforming = CurrentState == CharacterState.Transform,
+                AttackKind = ToCombatAttackKind(damageData.attackType),
+                HasAttacker = hasAttacker,
+                IsSelfAttack = hasAttacker && damageData.attacker == gameObject,
+                IsAlreadyReflecting = isReflectingDamage,
+                AttackerDistance = attackerDistance,
+                MaxReflectRange = DamageCalculator.DEFAULT_MAX_REFLECT_RANGE
+            };
+
+            CombatDamageResult result = DamageCalculator.CalculateIncomingDamage(damageInput, StatSource);
+            if (result.WasIgnored) return;
+
+            bool blocking = result.WasBlocked;
             bool blockingState = blocking || CurrentState == CharacterState.Block;
 
             Vector3 hitPos = blockingState && blockShieldVisual != null
@@ -1188,45 +1310,47 @@ namespace StickmanBeatEmUp.Characters
 
             if (blocking)
             {
-                incomingDamage *= blockDamageMultiplier;
                 TriggerBlockShieldFlash();
             }
 
-            bool hasHitStunImmunity = blocking || virtualShieldHp > 0f;
-
-            if (virtualShieldHp > 0f)
+            if (result.ShieldWasActive)
             {
-                float absorbed = Mathf.Min(virtualShieldHp, incomingDamage);
-                virtualShieldHp = Mathf.Max(0f, virtualShieldHp - absorbed);
-                incomingDamage -= absorbed;
+                virtualShieldHp = result.RemainingVirtualShield;
                 OnShieldChanged?.Invoke(virtualShieldHp, maxVirtualShieldHp);
 
-                TryReflectSpinalDamage(damageData);
+                if (result.ShouldReflectDamage)
+                {
+                    TryReflectSpinalDamage(damageData, result.ReflectedDamage);
+                }
 
-                if (virtualShieldHp <= 0f)
+                if (result.ShieldDepleted)
                 {
                     spinalFluidTimer = 0f;
                     spinalReflectDamage = 0f;
                 }
             }
-
-            if (incomingDamage > 0f)
+            else if (result.ShouldReflectDamage)
             {
-                currentHealth = Mathf.Max(0f, currentHealth - incomingDamage);
+                TryReflectSpinalDamage(damageData, result.ReflectedDamage);
+            }
+
+            if (result.FinalHealthDamage > 0f)
+            {
+                currentHealth = result.RemainingHealth;
                 OnHealthChanged?.Invoke(currentHealth, MaxHealth);
             }
 
             Vector3 popupPos = transform.position + Vector3.up * 1.5f;
             if (blocking)
             {
-                DamagePopupManager.SpawnBlocked(popupPos, incomingDamage);
+                DamagePopupManager.SpawnBlocked(popupPos, result.FinalHealthDamage);
             }
-            else if (incomingDamage > 0f)
+            else if (result.FinalHealthDamage > 0f)
             {
-                DamagePopupManager.SpawnPlayerHit(popupPos, incomingDamage);
+                DamagePopupManager.SpawnPlayerHit(popupPos, result.FinalHealthDamage);
             }
 
-            if (currentHealth <= 0f)
+            if (result.IsFatal)
             {
                 if (IsInTrainingMode())
                 {
@@ -1245,9 +1369,7 @@ namespace StickmanBeatEmUp.Characters
                 return;
             }
 
-            bool isSkillActive = CurrentState == CharacterState.Skill;
-            bool isTransforming = CurrentState == CharacterState.Transform;
-            if (!hasHitStunImmunity && Time.time >= stunImmunityUntilTime && !isSkillActive && !isTransforming)
+            if (result.ShouldTriggerHitStun)
             {
                 stunImmunityUntilTime = Time.time + hurtDuration + stunImmunityDuration;
                 if (hurtCoroutine != null)
@@ -1258,12 +1380,10 @@ namespace StickmanBeatEmUp.Characters
             }
         }
 
-        private void TryReflectSpinalDamage(DamageData damageData)
+        private void TryReflectSpinalDamage(DamageData damageData, float reflectAmount)
         {
             if (isReflectingDamage) return;
-            if (spinalReflectDamage <= 0f || damageData.attacker == null || damageData.attacker == gameObject) return;
-            if (damageData.attackType != AttackType.EnemyAttack && damageData.attackType != AttackType.EnemyHeavyAttack) return;
-            if (Vector2.Distance(transform.position, damageData.attacker.transform.position) > 4.5f) return;
+            if (reflectAmount <= 0f || damageData.attacker == null || damageData.attacker == gameObject) return;
 
             IDamageable attackerDmg = damageData.attacker.GetComponent<IDamageable>()
                 ?? damageData.attacker.GetComponentInParent<IDamageable>();
@@ -1273,7 +1393,7 @@ namespace StickmanBeatEmUp.Characters
             try
             {
                 DamageData reflectData = new DamageData(
-                    spinalReflectDamage,
+                    reflectAmount,
                     Vector2.zero,
                     AttackType.TransformBurst,
                     false,
@@ -1458,9 +1578,10 @@ namespace StickmanBeatEmUp.Characters
                 col.enabled = true;
             }
 
-            if (inputHandler != null)
+            IInputProvider respawnInput = InputProvider;
+            if (respawnInput != null)
             {
-                inputHandler.IsInputBlocked = false;
+                respawnInput.IsInputBlocked = false;
             }
 
             currentHealth = MaxHealth;
