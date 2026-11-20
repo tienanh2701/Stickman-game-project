@@ -1,0 +1,14 @@
+﻿{
+    "name": "Stickman.CorePure",
+    "rootNamespace": "StickmanBeatEmUp.CorePure",
+    "references": [],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": true
+}

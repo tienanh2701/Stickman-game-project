@@ -7,7 +7,7 @@ import subprocess
 import xml.etree.ElementTree as ET
 from PIL import Image
 
-PROJECT_ROOT = r"c:\Users\Admin\Documents\Tài liệu của TAnh\2026.1\VibeApp\OOP Project\Stickman game"
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CSC_DLL = r"C:\Program Files\Unity\Hub\Editor\6000.5.4f1\Editor\Data\DotNetSdk\sdk\8.0.318\Roslyn\bincore\csc.dll"
 
 def parse_csproj(csproj_path):
