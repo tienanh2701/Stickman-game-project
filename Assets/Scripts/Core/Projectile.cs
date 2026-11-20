@@ -2,7 +2,6 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using StickmanBeatEmUp.Characters;
-using StickmanBeatEmUp.Enemies;
 using StickmanBeatEmUp.Level;
 
 namespace StickmanBeatEmUp.Core
@@ -223,26 +222,24 @@ namespace StickmanBeatEmUp.Core
 
         private static bool IsEliteOrBoss(Collider2D other, IDamageable target)
         {
-            if (target is BossBase ||
-                target is BossController ||
-                target is EliteEnemy ||
-                target is EliteBruiserEnemy ||
-                target is BossPartHitbox ||
-                target is CrystalCore ||
-                target is TetherCableHitbox)
+            if (target != null && target.Transform != null)
             {
-                return true;
+                ICombatTargetProfile profile = target.Transform.GetComponent<ICombatTargetProfile>()
+                    ?? target.Transform.GetComponentInParent<ICombatTargetProfile>();
+                if (profile != null && profile.IsEliteOrBoss)
+                {
+                    return true;
+                }
             }
 
-            EnemyBase enemyBase = (target as EnemyBase) ?? other.GetComponentInParent<EnemyBase>();
-            if (enemyBase != null && enemyBase.Data != null && (enemyBase.Data.isElite || enemyBase.Data.isBoss))
+            if (other != null)
             {
-                return true;
-            }
-
-            if (other.GetComponentInParent<BossBase>() != null || other.GetComponentInParent<BossController>() != null)
-            {
-                return true;
+                ICombatTargetProfile otherProfile = other.GetComponent<ICombatTargetProfile>()
+                    ?? other.GetComponentInParent<ICombatTargetProfile>();
+                if (otherProfile != null && otherProfile.IsEliteOrBoss)
+                {
+                    return true;
+                }
             }
 
             return false;

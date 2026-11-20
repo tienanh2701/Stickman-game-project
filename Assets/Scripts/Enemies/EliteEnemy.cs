@@ -1,4 +1,5 @@
 using StickmanBeatEmUp.Core;
+using StickmanBeatEmUp.Economy;
 
 namespace StickmanBeatEmUp.Enemies
 {
@@ -9,6 +10,8 @@ namespace StickmanBeatEmUp.Enemies
     public abstract class EliteEnemy : EnemyBase
     {
         protected float nextSpecialTime;
+
+        public override bool IsEliteOrBoss => true;
 
         protected override void Awake()
         {
@@ -24,6 +27,15 @@ namespace StickmanBeatEmUp.Enemies
 
         protected override int GetHitAnimState() => 4;
         protected override int GetDeathAnimState() => 5;
+
+        protected override int GetKillCoinReward()
+        {
+            if (enemyData != null && enemyData.isBoss)
+            {
+                return CurrencyManager.REWARD_BOSS;
+            }
+            return CurrencyManager.REWARD_ELITE;
+        }
 
         public override void TakeDamage(DamageData damageData)
         {

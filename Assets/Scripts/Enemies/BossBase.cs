@@ -15,7 +15,7 @@ namespace StickmanBeatEmUp.Enemies
     /// Provides shared Boss vitals, HP/Status events for GameUIManager, Telegraph cues, and Freeze (Diend).
     /// </summary>
     [RequireComponent(typeof(Rigidbody2D), typeof(Collider2D))]
-    public abstract class BossBase : MonoBehaviour, IDamageable
+    public abstract class BossBase : MonoBehaviour, IDamageable, ICombatTargetProfile, IFreezable
     {
         protected static readonly int AnimStateHash = Animator.StringToHash("State");
 
@@ -41,6 +41,7 @@ namespace StickmanBeatEmUp.Enemies
 
         public virtual bool HasSuperArmor => bossData == null || bossData.hasSuperArmor;
         public virtual bool IsShielded => false;
+        public virtual bool IsEliteOrBoss => true;
         public bool IsEndlessEnraged => isEndlessEnraged;
         public bool IsTrainingDummy => isTrainingDummy;
 

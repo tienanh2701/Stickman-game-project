@@ -14,7 +14,7 @@ namespace StickmanBeatEmUp.Enemies
     /// Cơ chế Super Armor (chỉ khựng bởi U, I, Combo), và quản lý Máu/Chết.
     /// </summary>
     [RequireComponent(typeof(Rigidbody2D), typeof(Collider2D))]
-    public abstract class BaseEnemy : MonoBehaviour, IDamageable
+    public abstract class BaseEnemy : MonoBehaviour, IDamageable, ICombatTargetProfile, IFreezable
     {
         [Header("Stats Config (ScriptableObject)")]
         [SerializeField] protected EnemyStatsSO stats;
@@ -49,9 +49,10 @@ namespace StickmanBeatEmUp.Enemies
             whiteFlashMaterial = null;
         }
 
-        // Properties công khai (IDamageable)
+        // Properties công khai (IDamageable & ICombatTargetProfile)
         public Transform Transform => transform;
         public bool IsDead => currentState == EnemyState.Dead;
+        public virtual bool IsEliteOrBoss => false;
         public EnemyState CurrentState => currentState;
         public float CurrentHealth => currentHealth;
         public float MaxHealth => stats != null ? stats.maxHealth : 50f;
