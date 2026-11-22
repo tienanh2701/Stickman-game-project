@@ -2,7 +2,6 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using StickmanBeatEmUp.Core;
-using StickmanBeatEmUp.Enemies;
 
 namespace StickmanBeatEmUp.Characters
 {
@@ -355,12 +354,10 @@ namespace StickmanBeatEmUp.Characters
                     dmg.TakeDamage(new DamageData(specialDamage, Vector2.zero, AttackType.Combo_DashI, true, playerTarget != null ? playerTarget.gameObject : gameObject));
                     if (!dmg.IsDead)
                     {
-                        BaseEnemy legacyEnemy = dmg as BaseEnemy;
-                        if (legacyEnemy != null) legacyEnemy.Freeze(freezeDuration);
-                        EnemyBase enemyBase = dmg as EnemyBase;
-                        if (enemyBase != null) enemyBase.Freeze(freezeDuration);
-                        BossBase bossBase = dmg as BossBase;
-                        if (bossBase != null) bossBase.Freeze(freezeDuration);
+                        IFreezable freezable = col.GetComponent<IFreezable>()
+                            ?? col.GetComponentInParent<IFreezable>()
+                            ?? (dmg.Transform != null ? dmg.Transform.GetComponent<IFreezable>() : null);
+                        freezable?.Freeze(freezeDuration);
                     }
                 }
             }

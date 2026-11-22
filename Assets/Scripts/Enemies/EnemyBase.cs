@@ -15,7 +15,7 @@ namespace StickmanBeatEmUp.Enemies
     /// Provides HP management, telegraph red-flash cue, Super Armor vs Stagger, Freeze (Diend), and trimmed Animator state syncing.
     /// </summary>
     [RequireComponent(typeof(Rigidbody2D), typeof(Collider2D))]
-    public abstract class EnemyBase : MonoBehaviour, IDamageable
+    public abstract class EnemyBase : MonoBehaviour, IDamageable, ICombatTargetProfile, IFreezable
     {
         protected static readonly int AnimStateHash = Animator.StringToHash("State");
 
@@ -64,6 +64,7 @@ namespace StickmanBeatEmUp.Enemies
 
         public virtual bool HasSuperArmor => (enemyData != null && enemyData.hasSuperArmor) || isSuperArmorActive;
         public virtual bool IsShielded => isShielded;
+        public virtual bool IsEliteOrBoss => enemyData != null && (enemyData.isElite || enemyData.isBoss);
 
         public event Action<float, float> OnHealthChanged;
         public event Action<EnemyBase> OnDied;
@@ -635,6 +636,27 @@ namespace StickmanBeatEmUp.Enemies
         protected virtual int GetHitAnimState() => 3;
         protected virtual int GetDeathAnimState() => 4;
 
+        protected virtual int GetKillCoinReward()
+        {
+            if (enemyData != null && !string.IsNullOrEmpty(enemyData.enemyName) &&
+                enemyData.enemyName.IndexOf("Saibaman", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                return CurrencyManager.REWARD_SAIBAMAN;
+            }
+
+            if (enemyData != null && enemyData.isBoss)
+            {
+                return CurrencyManager.REWARD_BOSS;
+            }
+
+            if (enemyData != null && enemyData.isElite)
+            {
+                return CurrencyManager.REWARD_ELITE;
+            }
+
+            return CurrencyManager.REWARD_NORMAL_CREEP;
+        }
+
         /// <summary>
         /// Immediately destroys this enemy instance without awarding coins or firing death/victory events.
         /// Used for silent Training Clear-All and Endless cleanup.
@@ -683,25 +705,7 @@ namespace StickmanBeatEmUp.Enemies
                 CurrencyManager cm = CurrencyManager.Instance;
                 if (cm != null && !cm.SuppressEnemyRewards)
                 {
-                    int reward;
-                    if (this is KamikazeCreep || (enemyData != null && !string.IsNullOrEmpty(enemyData.enemyName) &&
-                        enemyData.enemyName.IndexOf("Saibaman", StringComparison.OrdinalIgnoreCase) >= 0))
-                    {
-                        reward = CurrencyManager.REWARD_SAIBAMAN;
-                    }
-                    else if (enemyData != null && enemyData.isBoss)
-                    {
-                        reward = CurrencyManager.REWARD_BOSS;
-                    }
-                    else if (this is EliteEnemy || (enemyData != null && enemyData.isElite))
-                    {
-                        reward = CurrencyManager.REWARD_ELITE;
-                    }
-                    else
-                    {
-                        reward = CurrencyManager.REWARD_NORMAL_CREEP;
-                    }
-
+                    int reward = GetKillCoinReward();
                     CurrencyManager.RewardEnemyKill(reward, transform.position);
                 }
 

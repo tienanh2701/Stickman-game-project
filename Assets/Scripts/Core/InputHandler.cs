@@ -4,11 +4,12 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.InputSystem.Controls;
 #endif
+using StickmanBeatEmUp.CorePure.Interfaces;
 
 namespace StickmanBeatEmUp.Core
 {
     /// <summary>
-    /// Xử lý Input tập trung cho Player:
+    /// Xử lý Input tập trung cho Player (Adapter triển khai IInputProvider theo DIP):
     /// - A/D: Di chuyển trái/phải
     /// - Space: Nhảy
     /// - Double-tap A / D: Lướt (Dash)
@@ -17,7 +18,7 @@ namespace StickmanBeatEmUp.Core
     /// - I: Kỹ năng 2 (Skill 2)
     /// - O: Phím Biến Hình (Transform)
     /// </summary>
-    public class InputHandler : MonoBehaviour
+    public class InputHandler : MonoBehaviour, IInputProvider
     {
         [Header("Double Tap Settings (Dash)")]
         [Tooltip("Khoảng thời gian tối đa giữa 2 lần nhấn để tính là Double-tap (giây)")]
@@ -56,6 +57,12 @@ namespace StickmanBeatEmUp.Core
 
         public float HorizontalInput { get; private set; }
         public bool IsInputBlocked { get; set; } = false;
+        public bool IsDropModifierHeld =>
+            !IsInputBlocked &&
+            (IsKeyPressed(KeyCode.S) ||
+             WasKeyPressedThisFrame(KeyCode.S) ||
+             IsKeyPressed(KeyCode.DownArrow) ||
+             WasKeyPressedThisFrame(KeyCode.DownArrow));
 
         private void Update()
         {

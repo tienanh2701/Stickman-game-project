@@ -2,6 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using StickmanBeatEmUp.Core;
+using StickmanBeatEmUp.Economy;
 
 namespace StickmanBeatEmUp.Enemies
 {
@@ -12,6 +13,7 @@ namespace StickmanBeatEmUp.Enemies
     /// </summary>
     public class KamikazeCreep : MeleeCreep
     {
+        protected override int GetKillCoinReward() => CurrencyManager.REWARD_SAIBAMAN;
         protected override void TickBehavior()
         {
             if (playerTarget == null) return;

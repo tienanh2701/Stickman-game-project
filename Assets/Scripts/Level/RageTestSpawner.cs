@@ -238,12 +238,6 @@ namespace StickmanBeatEmUp.Level
                     if (campaignCores[i] != null && !campaignCores[i].IsDead) campaignCores[i].TakeDamage(lethal);
                 }
 
-                TetherCableHitbox[] campaignCables = FindObjectsByType<TetherCableHitbox>();
-                for (int i = 0; i < campaignCables.Length; i++)
-                {
-                    if (campaignCables[i] != null && !campaignCables[i].IsDead) campaignCables[i].TakeDamage(lethal);
-                }
-
                 BossPartHitbox[] parts = FindObjectsByType<BossPartHitbox>();
                 for (int i = 0; i < parts.Length; i++)
                 {

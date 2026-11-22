@@ -46,6 +46,7 @@ namespace StickmanBeatEmUp.Enemies
         private Vector3 groundOriginPos;
 
         public BossPhase CurrentPhase => currentPhase;
+        public override bool IsEliteOrBoss => true;
 
         protected override void Awake()
         {

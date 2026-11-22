@@ -47,7 +47,9 @@ def parse_csproj(csproj_path):
 def compile_roslyn(name, csproj_path, source_glob_dir, extra_refs=None):
     defines, lang_ver, refs = parse_csproj(csproj_path)
     if extra_refs:
-        refs = [r for r in refs if os.path.basename(r).lower() != "assembly-csharp.dll"] + list(extra_refs)
+        override_names = {os.path.basename(r).lower() for r in extra_refs}
+        override_names.add(f"{name.lower()}.dll")
+        refs = [r for r in refs if os.path.basename(r).lower() not in override_names] + list(extra_refs)
 
     cs_files = sorted(glob.glob(os.path.join(source_glob_dir, "**", "*.cs"), recursive=True))
     out_dll = os.path.join(tempfile.gettempdir(), f"verify_{name}.dll")
@@ -159,9 +161,27 @@ def check_world_exclusivity():
         print("  EXCLUSIVITY ISSUE: Missing call:", m)
     return len(missing) == 0
 
+def check_corepure_no_unity():
+    corepure_dir = os.path.join(PROJECT_ROOT, "Assets", "CorePure")
+    violations = []
+    pattern = re.compile(r"^\s*using\s+Unity(?:Engine|Editor)\b", re.MULTILINE)
+    if os.path.isdir(corepure_dir):
+        for path in sorted(glob.glob(os.path.join(corepure_dir, "**", "*.cs"), recursive=True)):
+            with open(path, "r", encoding="utf-8", errors="ignore") as f:
+                text = f.read()
+            if pattern.search(text):
+                violations.append(path)
+    print(f"[CorePure] no_unity_violations={len(violations)}")
+    for v in violations:
+        print("  COREPURE VIOLATION:", v)
+    return len(violations) == 0
+
+
 def check_metas_and_unity_logs():
-    cs_all = glob.glob(os.path.join(PROJECT_ROOT, "Assets", "Scripts", "**", "*.cs"), recursive=True) + \
-             glob.glob(os.path.join(PROJECT_ROOT, "Assets", "Editor", "**", "*.cs"), recursive=True)
+    cs_all = glob.glob(os.path.join(PROJECT_ROOT, "Assets", "CorePure", "**", "*.cs"), recursive=True) + \
+             glob.glob(os.path.join(PROJECT_ROOT, "Assets", "Scripts", "**", "*.cs"), recursive=True) + \
+             glob.glob(os.path.join(PROJECT_ROOT, "Assets", "Editor", "**", "*.cs"), recursive=True) + \
+             glob.glob(os.path.join(PROJECT_ROOT, "Assets", "Tests", "CoreUnit", "**", "*.cs"), recursive=True)
     missing_metas = [p for p in cs_all if not os.path.exists(p + ".meta")]
     print(f"[Metas] scripts={len(cs_all)}, pending_unity_meta={len(missing_metas)}")
 
@@ -173,26 +193,50 @@ def check_metas_and_unity_logs():
         print("[AutoSetupResult.txt] NOT YET WRITTEN (waiting for Unity Editor focus/compile refresh)")
 
 def main():
-    ok_runtime, runtime_dll = compile_roslyn(
-        "Assembly-CSharp",
-        os.path.join(PROJECT_ROOT, "Assembly-CSharp.csproj"),
-        os.path.join(PROJECT_ROOT, "Assets", "Scripts"),
-    )
+    corepure_dir = os.path.join(PROJECT_ROOT, "Assets", "CorePure")
+    corepure_csproj = os.path.join(PROJECT_ROOT, "Stickman.CorePure.csproj")
+    corepure_lib_dll = os.path.join(PROJECT_ROOT, "Library", "ScriptAssemblies", "Stickman.CorePure.dll")
+    extra_runtime_refs = []
+
+    ok_corepure = True
+    if os.path.isdir(corepure_dir) and glob.glob(os.path.join(corepure_dir, "**", "*.cs"), recursive=True):
+        if os.path.exists(corepure_csproj):
+            ok_corepure, corepure_dll = compile_roslyn(
+                "Stickman.CorePure",
+                corepure_csproj,
+                corepure_dir,
+            )
+            if ok_corepure:
+                extra_runtime_refs.append(corepure_dll)
+        elif os.path.exists(corepure_lib_dll):
+            extra_runtime_refs.append(corepure_lib_dll)
+
+    ok_runtime = False
+    runtime_dll = None
+    if ok_corepure:
+        ok_runtime, runtime_dll = compile_roslyn(
+            "Assembly-CSharp",
+            os.path.join(PROJECT_ROOT, "Assembly-CSharp.csproj"),
+            os.path.join(PROJECT_ROOT, "Assets", "Scripts"),
+            extra_refs=extra_runtime_refs if extra_runtime_refs else None,
+        )
     ok_editor = False
     if ok_runtime:
+        editor_extra_refs = list(extra_runtime_refs) + [runtime_dll]
         ok_editor, _ = compile_roslyn(
             "Assembly-CSharp-Editor",
             os.path.join(PROJECT_ROOT, "Assembly-CSharp-Editor.csproj"),
             os.path.join(PROJECT_ROOT, "Assets", "Editor"),
-            extra_refs=[runtime_dll],
+            extra_refs=editor_extra_refs,
         )
+    ok_corepure_clean = check_corepure_no_unity()
     ok_names = check_class_filenames()
     ok_sprites = check_sprites()
     ok_exclusivity = check_world_exclusivity()
     check_metas_and_unity_logs()
 
-    all_ok = ok_runtime and ok_editor and ok_names and ok_sprites and ok_exclusivity
-    print(f"\nVERIFY SUMMARY: runtime={ok_runtime}, editor={ok_editor}, names={ok_names}, sprites={ok_sprites}, exclusivity={ok_exclusivity}")
+    all_ok = ok_corepure and ok_corepure_clean and ok_runtime and ok_editor and ok_names and ok_sprites and ok_exclusivity
+    print(f"\nVERIFY SUMMARY: corepure={ok_corepure}, corepure_clean={ok_corepure_clean}, runtime={ok_runtime}, editor={ok_editor}, names={ok_names}, sprites={ok_sprites}, exclusivity={ok_exclusivity}")
     sys.exit(0 if all_ok else 1)
 
 if __name__ == "__main__":

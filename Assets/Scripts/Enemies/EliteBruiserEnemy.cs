@@ -18,6 +18,8 @@ namespace StickmanBeatEmUp.Enemies
         [SerializeField] private Transform slamImpactPoint;
         [SerializeField] private float shockwaveSpeed = 9f;
 
+        public override bool IsEliteOrBoss => true;
+
         protected override void Awake()
         {
             base.Awake();

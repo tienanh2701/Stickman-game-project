@@ -171,7 +171,7 @@ namespace StickmanBeatEmUp.Enemies
             tetherLine.SetPosition(0, start);
             tetherLine.SetPosition(1, end);
 
-            if (tetherCable != null && !tetherCable.IsDead)
+            if (tetherCable != null)
             {
                 tetherCable.transform.position = Vector3.Lerp(start, end, 0.5f);
             }

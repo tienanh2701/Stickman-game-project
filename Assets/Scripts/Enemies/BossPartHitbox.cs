@@ -18,7 +18,7 @@ namespace StickmanBeatEmUp.Enemies
     /// Modular multi-part hitbox for Mecha Colossus Boss (LeftArm, RightArm, ChestCore x2 damage).
     /// </summary>
     [RequireComponent(typeof(Collider2D))]
-    public class BossPartHitbox : MonoBehaviour, IDamageable
+    public class BossPartHitbox : MonoBehaviour, IDamageable, ICombatTargetProfile
     {
         [SerializeField] private BossPartRole partRole = BossPartRole.LeftArm;
         [SerializeField] private float partHealth = 180f;
@@ -27,6 +27,7 @@ namespace StickmanBeatEmUp.Enemies
         public BossPartRole Role => partRole;
         public Transform Transform => transform;
         public bool IsDead { get; private set; }
+        public bool IsEliteOrBoss => true;
         public bool IsVulnerable { get; private set; } = true;
         public float CurrentHealth { get; private set; }
 

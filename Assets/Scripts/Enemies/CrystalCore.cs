@@ -12,7 +12,7 @@ namespace StickmanBeatEmUp.Enemies
     /// Enlarged to 2.35x scale and guarded by a 100% damage-immunity barrier while the War Hammer main body stands.
     /// </summary>
     [RequireComponent(typeof(Collider2D))]
-    public class CrystalCore : MonoBehaviour, IDamageable
+    public class CrystalCore : MonoBehaviour, IDamageable, ICombatTargetProfile
     {
         public const float ENLARGED_SCALE = 2.35f;
         private const float SHIELD_RING_DURATION = 0.22f;
@@ -24,6 +24,7 @@ namespace StickmanBeatEmUp.Enemies
         public Transform Transform => transform;
         public bool IsDead { get; private set; }
         public bool IsDestroyed => IsDead;
+        public bool IsEliteOrBoss => true;
         public float CurrentHealth { get; private set; }
         public float MaxHealth => maxHealth;
         public bool IsShieldProtected => !IsDestroyed && mainTitanBody != null && !mainTitanBody.IsMainBodyDefeated;
