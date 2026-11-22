@@ -44,12 +44,12 @@ namespace StickmanBeatEmUp.CorePure.Patterns.Decorators
                 throw new ArgumentNullException(nameof(decoratorFactory));
             }
 
-            if (durationSeconds <= 0f)
+            if (float.IsNaN(durationSeconds) || float.IsInfinity(durationSeconds) || durationSeconds <= 0f)
             {
                 return;
             }
 
-            float sanitizedShield = Math.Max(0f, shieldAmount);
+            float sanitizedShield = SanitizeNonNegative(shieldAmount);
             if (expiresWhenShieldDepleted && sanitizedShield <= 0f)
             {
                 return;
@@ -82,7 +82,7 @@ namespace StickmanBeatEmUp.CorePure.Patterns.Decorators
         /// </summary>
         public void Tick(float deltaTime)
         {
-            if (deltaTime <= 0f || activeBuffs.Count == 0)
+            if (float.IsNaN(deltaTime) || float.IsInfinity(deltaTime) || deltaTime <= 0f || activeBuffs.Count == 0)
             {
                 return;
             }
@@ -113,7 +113,7 @@ namespace StickmanBeatEmUp.CorePure.Patterns.Decorators
             }
 
             ActiveBuffEntry entry = activeBuffs[index];
-            entry.RemainingShield = Math.Max(0f, remainingShield);
+            entry.RemainingShield = SanitizeNonNegative(remainingShield);
             if (entry.ExpiresWhenShieldDepleted && entry.RemainingShield <= 0f)
             {
                 activeBuffs.RemoveAt(index);
@@ -152,9 +152,9 @@ namespace StickmanBeatEmUp.CorePure.Patterns.Decorators
         /// Lắp chuỗi Decorator tuần tự quanh nguồn chỉ số nền theo danh sách buff đang còn hạn.
         /// Độ phức tạp thời gian: O(n).
         /// </summary>
-        public IStatSource BuildStatChain(IStatSource baseSource)
+        public IStatSource BuildStatChain(IStatSource baseSource = null)
         {
-            IStatSource current = baseSource ?? new DefaultStatSource();
+            IStatSource current = baseSource ?? DefaultStatSource.Default;
             for (int i = 0; i < activeBuffs.Count; i++)
             {
                 current = activeBuffs[i].DecoratorFactory(current);
@@ -218,6 +218,15 @@ namespace StickmanBeatEmUp.CorePure.Patterns.Decorators
                     expiresOnShieldZero,
                     factory);
             }
+        }
+
+        private static float SanitizeNonNegative(float value)
+        {
+            if (float.IsNaN(value) || float.IsInfinity(value) || value < 0f)
+            {
+                return 0f;
+            }
+            return value;
         }
 
         private int FindBuffIndex(string buffId)

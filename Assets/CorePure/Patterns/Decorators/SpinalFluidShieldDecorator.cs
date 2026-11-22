@@ -17,11 +17,20 @@ namespace StickmanBeatEmUp.CorePure.Patterns.Decorators
             float damageReflectBonus = 5f)
             : base(inner)
         {
-            this.shieldCapacityBonus = Math.Max(0f, shieldCapacityBonus);
-            this.damageReflectBonus = Math.Max(0f, damageReflectBonus);
+            this.shieldCapacityBonus = SanitizeNonNegative(shieldCapacityBonus);
+            this.damageReflectBonus = SanitizeNonNegative(damageReflectBonus);
         }
 
         public override float MaxShieldCapacity => Inner.MaxShieldCapacity + shieldCapacityBonus;
         public override float DamageReflectAmount => Inner.DamageReflectAmount + damageReflectBonus;
+
+        private static float SanitizeNonNegative(float value)
+        {
+            if (float.IsNaN(value) || float.IsInfinity(value) || value < 0f)
+            {
+                return 0f;
+            }
+            return value;
+        }
     }
 }

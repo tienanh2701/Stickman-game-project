@@ -13,9 +13,18 @@ namespace StickmanBeatEmUp.CorePure.Patterns.Decorators
         public RageRegenDecorator(IStatSource inner, float ragePerSecondBonus = 3f)
             : base(inner)
         {
-            this.ragePerSecondBonus = Math.Max(0f, ragePerSecondBonus);
+            this.ragePerSecondBonus = SanitizeNonNegative(ragePerSecondBonus);
         }
 
         public override float RagePerSecondBonus => Inner.RagePerSecondBonus + ragePerSecondBonus;
+
+        private static float SanitizeNonNegative(float value)
+        {
+            if (float.IsNaN(value) || float.IsInfinity(value) || value < 0f)
+            {
+                return 0f;
+            }
+            return value;
+        }
     }
 }
