@@ -1,0 +1,8 @@
+﻿<Solution>
+  <Project Path="Assembly-CSharp.csproj" />
+  <Project Path="Stickman.Tests.E2E.PlayMode.csproj" />
+  <Project Path="Stickman.Tests.E2E.EditMode.csproj" />
+  <Project Path="Assembly-CSharp-Editor.csproj" />
+  <Project Path="Stickman.CorePure.csproj" />
+  <Project Path="Stickman.Tests.CoreUnit.csproj" />
+</Solution>
