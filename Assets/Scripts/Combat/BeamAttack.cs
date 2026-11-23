@@ -10,7 +10,7 @@ namespace StickmanBeatEmUp.Combat
     /// Hỗ trợ cross-fade 60+ FPS mượt mà bằng 2 lớp SpriteRenderer cho kỹ năng biến hình của Goku & Diend.
     /// </summary>
     [RequireComponent(typeof(BoxCollider2D))]
-    public class BeamAttack : MonoBehaviour
+    public class BeamAttack : MonoBehaviour, IPoolableCombatObject
     {
         public enum BeamVisualStyle
         {
@@ -68,6 +68,7 @@ namespace StickmanBeatEmUp.Combat
         private Vector3 lastVfxScale = Vector3.one;
         private Vector3 lastVfxLocalPos = Vector3.zero;
         private Color lastTint = Color.white;
+        private System.Action<BeamAttack> returnToPoolCallback;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         private static void ResetStaticSpriteCache()
@@ -82,6 +83,62 @@ namespace StickmanBeatEmUp.Combat
             boxCol = GetComponent<BoxCollider2D>();
             boxCol.isTrigger = true;
             UpdateColliderSize();
+        }
+
+        public void SetReturnToPoolCallback(System.Action<BeamAttack> callback)
+        {
+            returnToPoolCallback = callback;
+        }
+
+        public void SetPoolReturnAction(System.Action<BeamAttack> callback)
+        {
+            returnToPoolCallback = callback;
+        }
+
+        public void OnSpawnedFromPool()
+        {
+            timer = 0f;
+            nextTickTime = 0f;
+            visualStyle = BeamVisualStyle.DefaultLine;
+            followAnchor = null;
+            anchorLocalOffset = Vector3.zero;
+            warmupTime = 0f;
+            fadeOutTime = 0f;
+            singleHitPerTarget = false;
+            activeStarted = false;
+            fadeOutStarted = false;
+            isCancelling = false;
+            cancelElapsed = 0f;
+            nextActiveTickElapsed = 0f;
+            activeVfxSprites = null;
+            alreadyHitTargets.Clear();
+
+            if (boxCol == null) boxCol = GetComponent<BoxCollider2D>();
+            if (boxCol != null) boxCol.enabled = true;
+            if (vfxLayerA != null) vfxLayerA.enabled = false;
+            if (vfxLayerB != null) vfxLayerB.enabled = false;
+        }
+
+        public void OnReturnedToPool()
+        {
+            followAnchor = null;
+            activeVfxSprites = null;
+            alreadyHitTargets.Clear();
+            if (boxCol != null) boxCol.enabled = false;
+            if (lineRenderer != null) lineRenderer.enabled = false;
+            if (vfxLayerA != null) vfxLayerA.enabled = false;
+            if (vfxLayerB != null) vfxLayerB.enabled = false;
+        }
+
+        private void ReleaseOrDestroy()
+        {
+            if (returnToPoolCallback != null)
+            {
+                returnToPoolCallback(this);
+                return;
+            }
+
+            Destroy(gameObject);
         }
 
         public void SetupBeam(DamageData damage, int dir, LayerMask mask, float activeDuration, float length = 15f, float width = 1.5f)
@@ -159,7 +216,7 @@ namespace StickmanBeatEmUp.Combat
 
             if (activeVfxSprites == null || vfxRoot == null)
             {
-                Destroy(gameObject);
+                ReleaseOrDestroy();
             }
         }
 
@@ -208,7 +265,7 @@ namespace StickmanBeatEmUp.Combat
 
                 if (timer >= duration)
                 {
-                    Destroy(gameObject);
+                    ReleaseOrDestroy();
                 }
                 return;
             }
@@ -227,7 +284,7 @@ namespace StickmanBeatEmUp.Combat
 
                 if (ct >= 1f)
                 {
-                    Destroy(gameObject);
+                    ReleaseOrDestroy();
                 }
                 return;
             }
@@ -282,7 +339,7 @@ namespace StickmanBeatEmUp.Combat
 
             if (timer >= totalLifetime)
             {
-                Destroy(gameObject);
+                ReleaseOrDestroy();
             }
         }
 

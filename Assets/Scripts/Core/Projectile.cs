@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -7,11 +8,12 @@ using StickmanBeatEmUp.Level;
 namespace StickmanBeatEmUp.Core
 {
     /// <summary>
-    /// Đạn/Chưởng cơ bản cho cả Player (Ki Blast, Gunshot, Thunder Spear) và Ranger Enemy
-    /// Hỗ trợ đạn xuyên thấu (Piercing), Tảng Đá Titan nổ diện rộng, tự hủy sau lifetime hoặc va chạm
+    /// Đạn/Chưởng cơ bản cho cả Player (Ki Blast, Gunshot, Thunder Spear) và Ranger Enemy.
+    /// Hỗ trợ đạn xuyên thấu (Piercing), Tảng Đá Titan nổ diện rộng, Object Pool và
+    /// quét chống tunneling giữa vị trí vật lý khung trước và hiện tại bằng Physics2D.CircleCast.
     /// </summary>
     [RequireComponent(typeof(Collider2D), typeof(Rigidbody2D))]
-    public class Projectile : MonoBehaviour
+    public class Projectile : MonoBehaviour, IPoolableCombatObject
     {
         [Header("Projectile Stats")]
         [SerializeField] private float speed = 12f;
@@ -20,13 +22,22 @@ namespace StickmanBeatEmUp.Core
         [SerializeField] private int maxPierceCount = 999;
         [SerializeField] private LayerMask targetLayer;
 
+        [Header("Anti-Tunneling Sweep")]
+        [SerializeField] private float minSweepRadius = 0.14f;
+        [SerializeField] private float maxSweepRadius = 0.65f;
+
         [Header("Impact Effect (Optional)")]
         [SerializeField] private GameObject impactVfxPrefab;
 
         private Rigidbody2D rb;
+        private Collider2D projCollider;
         private DamageData damageData;
         private int currentPierced = 0;
         private Vector2 moveDirection = Vector2.right;
+
+        private float defaultSpeed = 12f;
+        private bool defaultIsPiercing = false;
+        private int defaultMaxPierceCount = 999;
 
         private bool isTitanBoulder = false;
         private float boulderExplosionRadius = 7.0f;
@@ -34,6 +45,13 @@ namespace StickmanBeatEmUp.Core
         private bool hasExploded = false;
         private bool hasConsumed = false;
         private Coroutine lifeCoroutine;
+
+        private Vector2 previousPosition;
+        private bool hasPreviousPosition;
+        private float sweepRadius = 0.22f;
+        private Action<Projectile> returnToPoolCallback;
+
+        private readonly RaycastHit2D[] sweepHitsBuffer = new RaycastHit2D[16];
         private readonly HashSet<IDamageable> hitTargets = new HashSet<IDamageable>();
         private static Sprite cachedShockwaveRingSprite;
 
@@ -45,13 +63,75 @@ namespace StickmanBeatEmUp.Core
 
         private void Awake()
         {
+            defaultSpeed = speed;
+            defaultIsPiercing = isPiercing;
+            defaultMaxPierceCount = maxPierceCount;
+
             rb = GetComponent<Rigidbody2D>();
             rb.gravityScale = 0f;
-            GetComponent<Collider2D>().isTrigger = true;
+            projCollider = GetComponent<Collider2D>();
+            projCollider.isTrigger = true;
+            sweepRadius = ResolveSweepRadius();
         }
 
         public LayerMask TargetLayer => targetLayer;
         public GameObject Attacker => damageData.attacker;
+
+        public void SetReturnToPoolCallback(Action<Projectile> callback)
+        {
+            returnToPoolCallback = callback;
+        }
+
+        public void SetPoolReturnAction(Action<Projectile> callback)
+        {
+            returnToPoolCallback = callback;
+        }
+
+        public void OnSpawnedFromPool()
+        {
+            if (lifeCoroutine != null)
+            {
+                StopCoroutine(lifeCoroutine);
+                lifeCoroutine = null;
+            }
+
+            speed = defaultSpeed;
+            isPiercing = defaultIsPiercing;
+            maxPierceCount = defaultMaxPierceCount;
+            currentPierced = 0;
+            hasConsumed = false;
+            hasExploded = false;
+            isTitanBoulder = false;
+            boulderExplosionRadius = 7.0f;
+            boulderExplosionVfx = null;
+            hasPreviousPosition = false;
+            previousPosition = transform.position;
+            hitTargets.Clear();
+
+            if (projCollider == null) projCollider = GetComponent<Collider2D>();
+            if (projCollider != null) projCollider.enabled = true;
+            if (rb == null) rb = GetComponent<Rigidbody2D>();
+            if (rb != null)
+            {
+                rb.position = transform.position;
+                rb.linearVelocity = Vector2.zero;
+            }
+        }
+
+        public void OnReturnedToPool()
+        {
+            if (lifeCoroutine != null)
+            {
+                StopCoroutine(lifeCoroutine);
+                lifeCoroutine = null;
+            }
+
+            if (rb != null) rb.linearVelocity = Vector2.zero;
+            hasConsumed = true;
+            hasPreviousPosition = false;
+            hitTargets.Clear();
+            if (projCollider != null) projCollider.enabled = false;
+        }
 
         public void SetSpeed(float newSpeed)
         {
@@ -84,13 +164,42 @@ namespace StickmanBeatEmUp.Core
 
             // Xoay đầu đạn theo hướng bay
             float angle = Mathf.Atan2(moveDirection.y, moveDirection.x) * Mathf.Rad2Deg;
-            transform.rotation = Quaternion.Euler(0, 0, angle);
+            transform.rotation = Quaternion.Euler(0f, 0f, angle);
 
             if (rb == null) rb = GetComponent<Rigidbody2D>();
+            if (projCollider == null) projCollider = GetComponent<Collider2D>();
+            if (projCollider != null) projCollider.enabled = true;
+            sweepRadius = ResolveSweepRadius();
+
+            Vector2 startPos = transform.position;
+            rb.position = startPos;
             rb.linearVelocity = moveDirection * speed;
+            previousPosition = startPos;
+            hasPreviousPosition = true;
 
             if (lifeCoroutine != null) StopCoroutine(lifeCoroutine);
             lifeCoroutine = StartCoroutine(LifetimeRoutine());
+        }
+
+        private float ResolveSweepRadius()
+        {
+            if (TryGetComponent<CircleCollider2D>(out CircleCollider2D circle))
+            {
+                float maxScale = Mathf.Max(Mathf.Abs(transform.lossyScale.x), Mathf.Abs(transform.lossyScale.y));
+                return Mathf.Clamp(circle.radius * maxScale, minSweepRadius, maxSweepRadius);
+            }
+
+            if (projCollider != null)
+            {
+                Vector3 ext = projCollider.bounds.extents;
+                float minExtent = Mathf.Min(ext.x, ext.y);
+                if (minExtent > 0.001f)
+                {
+                    return Mathf.Clamp(minExtent, minSweepRadius, maxSweepRadius);
+                }
+            }
+
+            return Mathf.Clamp(0.22f, minSweepRadius, maxSweepRadius);
         }
 
         private IEnumerator LifetimeRoutine()
@@ -105,8 +214,24 @@ namespace StickmanBeatEmUp.Core
             else if (!hasConsumed)
             {
                 hasConsumed = true;
-                Destroy(gameObject);
+                ReleaseOrDestroy();
             }
+        }
+
+        private void FixedUpdate()
+        {
+            if (hasConsumed || hasExploded) return;
+
+            Vector2 currentPos = transform.position;
+            if (!hasPreviousPosition)
+            {
+                previousPosition = currentPos;
+                hasPreviousPosition = true;
+                return;
+            }
+
+            SweepForTunneling(previousPosition, currentPos);
+            previousPosition = currentPos;
         }
 
         private void Update()
@@ -120,7 +245,66 @@ namespace StickmanBeatEmUp.Core
             }
         }
 
+        private void SweepForTunneling(Vector2 fromPos, Vector2 toPos)
+        {
+            Vector2 delta = toPos - fromPos;
+            float distance = delta.magnitude;
+            if (distance <= 0.0005f)
+            {
+                return;
+            }
+
+            int sweepMask = isTitanBoulder ? ~0 : targetLayer.value;
+            ContactFilter2D filter = new ContactFilter2D();
+            filter.useTriggers = true;
+            filter.useLayerMask = true;
+            filter.SetLayerMask(sweepMask);
+
+            int hitCount = Physics2D.CircleCast(fromPos, sweepRadius, delta / distance, filter, sweepHitsBuffer, distance);
+            if (hitCount <= 0)
+            {
+                return;
+            }
+
+            // Sắp xếp tăng dần theo distance (Insertion Sort tại chỗ, không cấp phát rác)
+            for (int i = 1; i < hitCount; i++)
+            {
+                RaycastHit2D key = sweepHitsBuffer[i];
+                int j = i - 1;
+                while (j >= 0 && sweepHitsBuffer[j].distance > key.distance)
+                {
+                    sweepHitsBuffer[j + 1] = sweepHitsBuffer[j];
+                    j--;
+                }
+                sweepHitsBuffer[j + 1] = key;
+            }
+
+            for (int i = 0; i < hitCount; i++)
+            {
+                if (hasConsumed || hasExploded)
+                {
+                    break;
+                }
+
+                Collider2D hitCol = sweepHitsBuffer[i].collider;
+                if (hitCol == null || hitCol == projCollider)
+                {
+                    continue;
+                }
+
+                Vector2? impactPos = sweepHitsBuffer[i].distance > 0.001f
+                    ? (Vector2?)sweepHitsBuffer[i].centroid
+                    : null;
+                ProcessColliderHit(hitCol, impactPos);
+            }
+        }
+
         private void OnTriggerEnter2D(Collider2D other)
+        {
+            ProcessColliderHit(other, null);
+        }
+
+        private void ProcessColliderHit(Collider2D other, Vector2? sweptImpactPosition)
         {
             if (hasConsumed || hasExploded || other == null) return;
 
@@ -132,6 +316,10 @@ namespace StickmanBeatEmUp.Core
 
             if (isTitanBoulder && IsWallOrBoundary(other))
             {
+                if (sweptImpactPosition.HasValue)
+                {
+                    transform.position = new Vector3(sweptImpactPosition.Value.x, sweptImpactPosition.Value.y, transform.position.z);
+                }
                 TriggerBoulderExplosion();
                 return;
             }
@@ -149,6 +337,10 @@ namespace StickmanBeatEmUp.Core
 
             if (isTitanBoulder && IsEliteOrBoss(other, target))
             {
+                if (sweptImpactPosition.HasValue)
+                {
+                    transform.position = new Vector3(sweptImpactPosition.Value.x, sweptImpactPosition.Value.y, transform.position.z);
+                }
                 TriggerBoulderExplosion();
                 return;
             }
@@ -172,34 +364,45 @@ namespace StickmanBeatEmUp.Core
             if (!isPiercing)
             {
                 hasConsumed = true;
-                if (lifeCoroutine != null)
-                {
-                    StopCoroutine(lifeCoroutine);
-                    lifeCoroutine = null;
-                }
-                Destroy(gameObject);
+                ReleaseOrDestroy();
+                return;
             }
-            else
+
+            currentPierced++;
+            if (currentPierced >= maxPierceCount)
             {
-                currentPierced++;
-                if (currentPierced >= maxPierceCount)
+                if (isTitanBoulder)
                 {
-                    if (isTitanBoulder)
-                    {
-                        TriggerBoulderExplosion();
-                    }
-                    else
-                    {
-                        hasConsumed = true;
-                        if (lifeCoroutine != null)
-                        {
-                            StopCoroutine(lifeCoroutine);
-                            lifeCoroutine = null;
-                        }
-                        Destroy(gameObject);
-                    }
+                    TriggerBoulderExplosion();
+                }
+                else
+                {
+                    hasConsumed = true;
+                    ReleaseOrDestroy();
                 }
             }
+        }
+
+        private void ReleaseOrDestroy()
+        {
+            if (lifeCoroutine != null)
+            {
+                StopCoroutine(lifeCoroutine);
+                lifeCoroutine = null;
+            }
+
+            if (rb != null)
+            {
+                rb.linearVelocity = Vector2.zero;
+            }
+
+            if (returnToPoolCallback != null)
+            {
+                returnToPoolCallback(this);
+                return;
+            }
+
+            Destroy(gameObject);
         }
 
         private bool IsWallOrBoundary(Collider2D other)
@@ -209,10 +412,10 @@ namespace StickmanBeatEmUp.Core
             if (other.GetComponent<BaseCharacter>() != null || other.GetComponent<IDamageable>() != null) return false;
 
             string objName = other.gameObject.name;
-            if (objName.IndexOf("Ground", System.StringComparison.OrdinalIgnoreCase) >= 0) return false;
+            if (objName.IndexOf("Ground", StringComparison.OrdinalIgnoreCase) >= 0) return false;
 
-            if (objName.IndexOf("Wall", System.StringComparison.OrdinalIgnoreCase) >= 0 ||
-                objName.IndexOf("Boundary", System.StringComparison.OrdinalIgnoreCase) >= 0)
+            if (objName.IndexOf("Wall", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                objName.IndexOf("Boundary", StringComparison.OrdinalIgnoreCase) >= 0)
             {
                 return true;
             }
@@ -283,7 +486,7 @@ namespace StickmanBeatEmUp.Core
                 }
             }
 
-            Destroy(gameObject);
+            ReleaseOrDestroy();
         }
 
         private void SpawnBoulderExplosionVisual()
