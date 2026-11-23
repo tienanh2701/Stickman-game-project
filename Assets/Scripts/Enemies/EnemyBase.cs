@@ -2,6 +2,9 @@ using System;
 using System.Collections;
 using UnityEngine;
 using StickmanBeatEmUp.Core;
+using StickmanBeatEmUp.CorePure.AI;
+using StickmanBeatEmUp.CorePure.Entities.DTOs;
+using StickmanBeatEmUp.CorePure.Interfaces;
 using StickmanBeatEmUp.Characters;
 using StickmanBeatEmUp.Economy;
 using StickmanBeatEmUp.Enemies.Stats;
@@ -12,10 +15,11 @@ namespace StickmanBeatEmUp.Enemies
 {
     /// <summary>
     /// OOP abstract base class for all non-boss enemies (Creeps and Elites).
-    /// Provides HP management, telegraph red-flash cue, Super Armor vs Stagger, Freeze (Diend), and trimmed Animator state syncing.
+    /// Provides HP management, telegraph red-flash cue, Super Armor vs Stagger, Freeze (Diend),
+    /// GoF Strategy AI delegation (IAIStrategy), ObjectPool recycling hooks, and trimmed Animator state syncing.
     /// </summary>
     [RequireComponent(typeof(Rigidbody2D), typeof(Collider2D))]
-    public abstract class EnemyBase : MonoBehaviour, IDamageable, ICombatTargetProfile, IFreezable
+    public abstract class EnemyBase : MonoBehaviour, IDamageable, ICombatTargetProfile, IFreezable, IPoolableCombatObject
     {
         protected static readonly int AnimStateHash = Animator.StringToHash("State");
 
@@ -38,15 +42,35 @@ namespace StickmanBeatEmUp.Enemies
         [Header("Combat & Stagger")]
         [SerializeField] protected float hurtDuration = 0.25f;
 
+        [Header("AI Strategy (GoF Strategy)")]
+        [SerializeField] protected int aiDifficultyLevel = (int)AIDifficultyPreset.Normal;
+
+        protected IAIStrategy aiStrategy;
+        private Action<EnemyBase> onPoolRelease;
+        private Coroutine poolReleaseRoutine;
+        private RigidbodyType2D initialBodyType = RigidbodyType2D.Dynamic;
+        private float baseMaxHealthOverride = 0f;
+
         public Transform Transform => transform;
         public bool IsDead { get; protected set; }
         public float CurrentHealth { get; protected set; }
         public float MaxHealth => (maxHealthOverride > 0f ? maxHealthOverride : (enemyData != null ? enemyData.maxHealth : 50f)) * runtimeHealthMult;
         public EnemyDataSO Data => enemyData;
 
+        public IAIStrategy AIStrategy => aiStrategy ?? (aiStrategy = CreateDefaultStrategy());
+        public IAIStrategy CurrentStrategy => AIStrategy;
+        public int AiDifficultyLevel
+        {
+            get => aiDifficultyLevel;
+            set => aiDifficultyLevel = AIDifficultyTuning.ClampDifficulty(value);
+        }
+        public AIDifficultyPreset AiDifficultyPreset => AIDifficultyTuning.ToPreset(aiDifficultyLevel);
+
         public float EffectiveAttackDamage => (enemyData != null ? enemyData.attackDamage : 10f) * runtimeDamageMult;
         public float EffectiveHeavyDamage => (enemyData != null ? enemyData.heavyAttackDamage : 20f) * runtimeDamageMult;
-        public float EffectiveAttackCooldown => (enemyData != null ? enemyData.attackCooldown : 1.5f) / Mathf.Max(0.1f, runtimeAttackSpeedMult);
+        public float EffectiveAttackCooldown =>
+            ((enemyData != null ? enemyData.attackCooldown : 1.5f) * AIDifficultyTuning.GetAttackCooldownScale(aiDifficultyLevel)) /
+            Mathf.Max(0.1f, runtimeAttackSpeedMult);
         public float EffectiveMoveSpeed => (enemyData != null ? enemyData.moveSpeed : 3.5f) * runtimeMoveSpeedMult;
         public float HurtDuration { get => hurtDuration; set => hurtDuration = Mathf.Max(0.05f, value); }
         public float BaseHurtDuration => baseHurtDuration;
@@ -93,6 +117,7 @@ namespace StickmanBeatEmUp.Enemies
         protected Rigidbody2D rb;
         protected Collider2D col;
         protected Transform playerTarget;
+        protected BaseCharacter playerCharacter;
         protected Color originalColor = Color.white;
         private Color baseOriginalColor = Color.white;
         protected Vector3 initialScale = Vector3.one;
@@ -134,8 +159,10 @@ namespace StickmanBeatEmUp.Enemies
         protected virtual void Awake()
         {
             baseHurtDuration = Mathf.Max(0.05f, hurtDuration);
+            baseMaxHealthOverride = maxHealthOverride;
             rb = GetComponent<Rigidbody2D>();
             col = GetComponent<Collider2D>();
+            if (rb != null) initialBodyType = rb.bodyType;
             if (spriteRenderer == null) spriteRenderer = GetComponentInChildren<SpriteRenderer>();
             if (animator == null) animator = GetComponentInChildren<Animator>();
             if (meleeHitbox == null) meleeHitbox = GetComponentInChildren<Hitbox>();
@@ -153,6 +180,11 @@ namespace StickmanBeatEmUp.Enemies
             {
                 int pLayer = LayerMask.NameToLayer("Player");
                 playerLayer = pLayer >= 0 ? (1 << pLayer) : ~0;
+            }
+
+            if (aiStrategy == null)
+            {
+                aiStrategy = CreateDefaultStrategy();
             }
         }
 
@@ -174,6 +206,171 @@ namespace StickmanBeatEmUp.Enemies
                 animator.speed = runtimeAttackSpeedMult;
             }
             SetAnimState(0);
+        }
+
+        public void SetAIStrategy(IAIStrategy strategy)
+        {
+            if (strategy != null)
+            {
+                aiStrategy = strategy;
+            }
+        }
+
+        public void SetStrategy(IAIStrategy strategy)
+        {
+            SetAIStrategy(strategy);
+        }
+
+        public void SetStrategyById(string strategyId)
+        {
+            aiStrategy = AIStrategyRegistry.Default.Resolve(strategyId, aiDifficultyLevel);
+        }
+
+        public void SetDifficulty(AIDifficultyPreset difficulty)
+        {
+            aiDifficultyLevel = (int)difficulty;
+        }
+
+        public void SetDifficulty(int difficultyLevel)
+        {
+            aiDifficultyLevel = AIDifficultyTuning.ClampDifficulty(difficultyLevel);
+        }
+
+        public void SetReturnToPoolCallback(Action<EnemyBase> callback)
+        {
+            onPoolRelease = callback;
+        }
+
+        protected virtual IAIStrategy CreateDefaultStrategy()
+        {
+            return new MeleeChaseStrategy();
+        }
+
+        protected virtual EnemyAIContext BuildAIContext()
+        {
+            BaseCharacter targetChar = playerCharacter;
+            if (targetChar == null && playerTarget != null)
+            {
+                targetChar = playerTarget.GetComponent<BaseCharacter>();
+                playerCharacter = targetChar;
+            }
+
+            bool isTargetAttacking = targetChar != null &&
+                (targetChar.CurrentState == CharacterState.Attack || targetChar.CurrentState == CharacterState.Skill);
+
+            return new EnemyAIContext
+            {
+                EnemyX = transform.position.x,
+                EnemyY = transform.position.y,
+                PlayerX = playerTarget != null ? playerTarget.position.x : transform.position.x,
+                PlayerY = playerTarget != null ? playerTarget.position.y : transform.position.y,
+                EnemyHp = CurrentHealth,
+                EnemyMaxHp = MaxHealth,
+                EnemyRage = 0f,
+                AttackRange = enemyData != null ? enemyData.attackRange : 1.45f,
+                PreferredRange = enemyData != null ? enemyData.preferredRange : 6.5f,
+                FleeRange = enemyData != null ? enemyData.fleeDistance : 2.5f,
+                AttackCooldownRemaining = Mathf.Max(0f, nextAttackTime - Time.time),
+                IsPlayerDead = targetChar != null && targetChar.IsDead,
+                IsPlayerAttacking = isTargetAttacking,
+                LightHitsReceivedInWindow = 0,
+                DeltaTime = Time.deltaTime,
+                DifficultyLevel = aiDifficultyLevel
+            };
+        }
+
+        public virtual void ApplyCampaignScaling(float hpMultiplier, float damageMultiplier)
+        {
+            runtimeHealthMult = Mathf.Max(0.1f, hpMultiplier);
+            runtimeDamageMult = Mathf.Max(0.1f, damageMultiplier);
+            CurrentHealth = MaxHealth;
+            OnHealthChanged?.Invoke(CurrentHealth, MaxHealth);
+        }
+
+        public virtual void ResetForPoolSpawn()
+        {
+            if (poolReleaseRoutine != null)
+            {
+                StopCoroutine(poolReleaseRoutine);
+                poolReleaseRoutine = null;
+            }
+
+            IsDead = false;
+            suppressCoinsAndDeathEvents = false;
+            isTrainingDummy = false;
+            maxHealthOverride = baseMaxHealthOverride;
+            InterruptActions();
+            isStaggered = false;
+            isFrozen = false;
+            isSuperArmorActive = false;
+            isShielded = false;
+            nextAttackTime = 0f;
+
+            runtimeHealthMult = 1f;
+            runtimeDamageMult = 1f;
+            runtimeMoveSpeedMult = 1f;
+            runtimeStaggerMult = 1f;
+            runtimeDamageReduction = 0f;
+            runtimeAttackSpeedMult = 1f;
+            isEndlessEnraged = false;
+            hurtDuration = baseHurtDuration;
+            ApplyEnragedVisuals(false);
+
+            aiStrategy = CreateDefaultStrategy();
+
+            transform.localScale = initialScale;
+            facingDirection = initialScale.x >= 0f ? 1f : -1f;
+            if (lockToGroundY)
+            {
+                Vector3 p = transform.position;
+                p.y = GROUND_Y;
+                transform.position = p;
+            }
+
+            if (rb != null)
+            {
+                rb.bodyType = initialBodyType;
+                rb.linearVelocity = Vector2.zero;
+            }
+            if (col != null) col.enabled = true;
+            if (animator != null) animator.speed = 1f;
+
+            CurrentHealth = MaxHealth;
+            OnHealthChanged?.Invoke(CurrentHealth, MaxHealth);
+            FindPlayerTarget();
+            FindCameraWalls();
+            SetAnimState(0);
+        }
+
+        public virtual void OnSpawnedFromPool()
+        {
+            ResetForPoolSpawn();
+        }
+
+        public virtual void OnReturnedToPool()
+        {
+            if (poolReleaseRoutine != null)
+            {
+                StopCoroutine(poolReleaseRoutine);
+                poolReleaseRoutine = null;
+            }
+            InterruptActions();
+            StopAllCoroutines();
+            DeactivateMeleeHitbox();
+            if (enragedAuraRenderer != null) enragedAuraRenderer.enabled = false;
+            if (rb != null) rb.linearVelocity = Vector2.zero;
+            OnDied = null;
+            OnHealthChanged = null;
+        }
+
+        private IEnumerator ReturnToPoolAfterDelayRoutine(float delay)
+        {
+            if (delay > 0f)
+            {
+                yield return new WaitForSeconds(delay);
+            }
+            poolReleaseRoutine = null;
+            onPoolRelease?.Invoke(this);
         }
 
         public void SetData(EnemyDataSO data)
@@ -324,13 +521,18 @@ namespace StickmanBeatEmUp.Enemies
         protected void FindPlayerTarget()
         {
             BaseCharacter player = FindAnyObjectByType<BaseCharacter>();
+            playerCharacter = player;
             if (player != null)
             {
                 playerTarget = player.transform;
                 return;
             }
             GameObject pObj = GameObject.FindGameObjectWithTag("Player");
-            if (pObj != null) playerTarget = pObj.transform;
+            if (pObj != null)
+            {
+                playerTarget = pObj.transform;
+                playerCharacter = pObj.GetComponent<BaseCharacter>();
+            }
         }
 
         protected virtual void Update()
@@ -665,6 +867,11 @@ namespace StickmanBeatEmUp.Enemies
         {
             suppressCoinsAndDeathEvents = true;
             IsDead = true;
+            if (poolReleaseRoutine != null)
+            {
+                StopCoroutine(poolReleaseRoutine);
+                poolReleaseRoutine = null;
+            }
             InterruptActions();
             StopAllCoroutines();
             DeactivateMeleeHitbox();
@@ -675,6 +882,13 @@ namespace StickmanBeatEmUp.Enemies
                 rb.linearVelocity = Vector2.zero;
                 rb.bodyType = RigidbodyType2D.Kinematic;
             }
+
+            if (onPoolRelease != null)
+            {
+                onPoolRelease(this);
+                return;
+            }
+
             Destroy(gameObject);
         }
 
@@ -682,6 +896,11 @@ namespace StickmanBeatEmUp.Enemies
         {
             if (IsDead) return;
             IsDead = true;
+            if (poolReleaseRoutine != null)
+            {
+                StopCoroutine(poolReleaseRoutine);
+                poolReleaseRoutine = null;
+            }
             InterruptActions();
             StopAllCoroutines();
 
@@ -710,6 +929,19 @@ namespace StickmanBeatEmUp.Enemies
                 }
 
                 OnDied?.Invoke(this);
+            }
+
+            if (onPoolRelease != null)
+            {
+                if (gameObject.activeInHierarchy)
+                {
+                    poolReleaseRoutine = StartCoroutine(ReturnToPoolAfterDelayRoutine(1.35f));
+                }
+                else
+                {
+                    onPoolRelease(this);
+                }
+                return;
             }
 
             Destroy(gameObject, 1.35f);

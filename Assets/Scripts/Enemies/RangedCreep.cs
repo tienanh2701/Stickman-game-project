@@ -1,12 +1,16 @@
 using System.Collections;
 using UnityEngine;
 using StickmanBeatEmUp.Core;
+using StickmanBeatEmUp.CorePure.AI;
+using StickmanBeatEmUp.CorePure.Entities.DTOs;
+using StickmanBeatEmUp.CorePure.Interfaces;
 
 namespace StickmanBeatEmUp.Enemies
 {
     /// <summary>
     /// Ranged Creep (Beast Titan, Frieza Blaster Soldier, Kasshin Trooper).
     /// Setup windups (pickup boulder, aim lock, plant staff) are merged into Attack1/Attack2 opening frames.
+    /// Delegates kiting/retreat/volley decisions to the injected IAIStrategy (GoF Strategy).
     /// </summary>
     public class RangedCreep : EnemyBase
     {
@@ -24,39 +28,45 @@ namespace StickmanBeatEmUp.Enemies
             volleyCount = Mathf.Max(1, burst);
         }
 
+        protected override IAIStrategy CreateDefaultStrategy()
+        {
+            return new RangedKiteStrategy();
+        }
+
+        public override void ResetForPoolSpawn()
+        {
+            useSecondaryShot = false;
+            base.ResetForPoolSpawn();
+        }
+
         protected override void TickBehavior()
         {
-            float dx = playerTarget.position.x - transform.position.x;
-            float distX = Mathf.Abs(dx);
-            float pref = enemyData != null ? enemyData.preferredRange : 6.5f;
-            float flee = enemyData != null ? enemyData.fleeDistance : 2.5f;
+            AIActionDecision decision = AIStrategy.ComputeAction(BuildAIContext());
             float speed = enemyData != null ? enemyData.moveSpeed : 2.8f;
 
-            if (distX < flee)
+            switch (decision.ActionType)
             {
-                // Keep safe spacing while retreating
-                MoveHorizontally(-Mathf.Sign(dx), speed * 0.9f);
-                SetAnimState(0);
-                return;
-            }
+                case AIActionType.MoveAwayFromPlayer:
+                case AIActionType.MoveTowardPlayer:
+                    MoveHorizontally(decision.MoveDirectionX, speed);
+                    if (decision.ShouldFacePlayer) FaceTarget();
+                    SetAnimState(0);
+                    break;
 
-            if (distX > pref * 1.15f)
-            {
-                MoveHorizontally(Mathf.Sign(dx), speed);
-                SetAnimState(0);
-                return;
-            }
+                case AIActionType.RangedVolley:
+                case AIActionType.LightAttack:
+                case AIActionType.HeavyAttack:
+                case AIActionType.SpecialPhase:
+                    StopHorizontalMovement();
+                    if (decision.ShouldFacePlayer) FaceTarget();
+                    actionRoutine = StartCoroutine(FireVolleyRoutine());
+                    break;
 
-            StopHorizontalMovement();
-            FaceTarget();
-
-            if (Time.time >= nextAttackTime)
-            {
-                actionRoutine = StartCoroutine(FireVolleyRoutine());
-            }
-            else
-            {
-                SetAnimState(0);
+                default:
+                    StopHorizontalMovement();
+                    if (decision.ShouldFacePlayer) FaceTarget();
+                    SetAnimState(0);
+                    break;
             }
         }
 
@@ -106,8 +116,9 @@ namespace StickmanBeatEmUp.Enemies
                 float ang = startAngle + i * volleySpreadDeg;
                 Vector2 dir = Quaternion.Euler(0f, 0f, ang) * baseDir;
 
-                GameObject go = Instantiate(projectilePrefab, spawnPos, Quaternion.identity);
-                Projectile proj = go.GetComponent<Projectile>();
+                Projectile proj = CombatObjectPool.Instance != null
+                    ? CombatObjectPool.Instance.SpawnProjectile(projectilePrefab, spawnPos, Quaternion.identity)
+                    : Instantiate(projectilePrefab, spawnPos, Quaternion.identity).GetComponent<Projectile>();
                 if (proj != null)
                 {
                     proj.SetSpeed(projSpeed);

@@ -2,6 +2,9 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using StickmanBeatEmUp.Core;
+using StickmanBeatEmUp.CorePure.AI;
+using StickmanBeatEmUp.CorePure.Entities.DTOs;
+using StickmanBeatEmUp.CorePure.Interfaces;
 using StickmanBeatEmUp.Economy;
 
 namespace StickmanBeatEmUp.Enemies
@@ -10,39 +13,52 @@ namespace StickmanBeatEmUp.Enemies
     /// Specialized kamikaze creep (e.g. Saibaman / suicide creep) inheriting from MeleeCreep.
     /// Runs toward player at 1.5x normal creep speed, latches on with an orange-red warning flash (0.42s),
     /// and detonates if not slain prior to fuse completion.
+    /// Delegates rush/detonate decisions to the injected IAIStrategy (GoF Strategy).
     /// </summary>
     public class KamikazeCreep : MeleeCreep
     {
         protected override int GetKillCoinReward() => CurrencyManager.REWARD_SAIBAMAN;
+
+        protected override IAIStrategy CreateDefaultStrategy()
+        {
+            return new KamikazeRushStrategy();
+        }
+
         protected override void TickBehavior()
         {
             if (playerTarget == null) return;
 
-            float distX = Mathf.Abs(playerTarget.position.x - transform.position.x);
-            float distY = Mathf.Abs(playerTarget.position.y - transform.position.y);
-            float range = enemyData != null ? enemyData.attackRange : 1.45f;
+            AIActionDecision decision = AIStrategy.ComputeAction(BuildAIContext());
 
-            if (distX <= range && distY <= 1.8f)
+            switch (decision.ActionType)
             {
-                StopHorizontalMovement();
-                FaceTarget();
-
-                if (Time.time >= nextAttackTime)
-                {
+                case AIActionType.Detonate:
+                case AIActionType.LightAttack:
+                case AIActionType.HeavyAttack:
+                case AIActionType.SpecialPhase:
+                    StopHorizontalMovement();
+                    if (decision.ShouldFacePlayer) FaceTarget();
                     actionRoutine = StartCoroutine(LatchAndExplodeRoutine());
-                }
-                else
+                    break;
+
+                case AIActionType.MoveTowardPlayer:
+                case AIActionType.MoveAwayFromPlayer:
                 {
+                    float baseSpeed = enemyData != null ? enemyData.moveSpeed : 3.5f;
+                    // Avoid double-multiplying when EnemyDataSO already stores the boosted 1.5x rush speed (> 4.0f)
+                    float normalizedSpeed = baseSpeed > 4.0f ? (baseSpeed / 1.5f) : baseSpeed;
+                    float speed = Mathf.Max(normalizedSpeed, 3.5f);
+                    MoveHorizontally(decision.MoveDirectionX, speed);
+                    if (decision.ShouldFacePlayer) FaceTarget();
                     SetAnimState(0);
+                    break;
                 }
-            }
-            else
-            {
-                float baseSpeed = enemyData != null ? enemyData.moveSpeed : 3.5f;
-                float speed = Mathf.Max(baseSpeed > 4.0f ? baseSpeed : baseSpeed * 1.5f, 5.25f);
-                float dirX = Mathf.Sign(playerTarget.position.x - transform.position.x);
-                MoveHorizontally(dirX, speed);
-                SetAnimState(0);
+
+                default:
+                    StopHorizontalMovement();
+                    if (decision.ShouldFacePlayer) FaceTarget();
+                    SetAnimState(0);
+                    break;
             }
         }
 

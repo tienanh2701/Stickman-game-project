@@ -1,6 +1,9 @@
 using System.Collections;
 using UnityEngine;
 using StickmanBeatEmUp.Core;
+using StickmanBeatEmUp.CorePure.AI;
+using StickmanBeatEmUp.CorePure.Entities.DTOs;
+using StickmanBeatEmUp.CorePure.Interfaces;
 using StickmanBeatEmUp.Level;
 
 namespace StickmanBeatEmUp.Enemies
@@ -177,37 +180,56 @@ namespace StickmanBeatEmUp.Enemies
             }
         }
 
+        protected override IAIStrategy CreateDefaultStrategy()
+        {
+            return new BossPhaseStrategy(defaultMeleeRange: 2.6f, specialTriggerMinRange: 2.6f, rageShieldThreshold: 100f);
+        }
+
+        protected override EnemyAIContext BuildBossAIContext()
+        {
+            return BuildBossAIContext(0f, Mathf.Max(0f, nextAttackTime - Time.time), 0);
+        }
+
         protected override void TickBossAI()
         {
             if (isDowned) return;
 
-            float dx = playerTarget.position.x - transform.position.x;
-            float distX = Mathf.Abs(dx);
-            float meleeRange = bossData != null ? bossData.attackRange : 2.6f;
+            AIActionDecision decision = AIStrategy.ComputeAction(BuildBossAIContext());
 
-            if (Time.time < nextAttackTime)
+            switch (decision.ActionType)
             {
-                if (distX > meleeRange)
+                case AIActionType.LightAttack:
+                case AIActionType.HeavyAttack:
+                case AIActionType.ParryCounter:
+                    if (Time.time >= nextAttackTime)
+                    {
+                        actionRoutine = StartCoroutine(HammerSmashRoutine());
+                        return;
+                    }
+                    break;
+
+                case AIActionType.SpecialPhase:
+                case AIActionType.RangedVolley:
+                    if (Time.time >= nextAttackTime)
+                    {
+                        actionRoutine = StartCoroutine(GroundSpikesRoutine());
+                        return;
+                    }
+                    break;
+
+                case AIActionType.MoveTowardPlayer:
+                case AIActionType.MoveAwayFromPlayer:
                 {
-                    float spd = bossData != null ? bossData.moveSpeed : 2.5f;
-                    FaceTarget();
-                    if (rb != null) rb.linearVelocity = new Vector2(Mathf.Sign(dx) * spd, rb.linearVelocity.y);
+                    float spd = EffectiveMoveSpeed * Mathf.Clamp(Mathf.Abs(decision.MoveDirectionX), 0.7f, 1.35f);
+                    float moveSign = decision.MoveDirectionX >= 0f ? 1f : -1f;
+                    if (decision.ShouldFacePlayer) FaceTarget();
+                    if (rb != null) rb.linearVelocity = new Vector2(moveSign * spd, rb.linearVelocity.y);
+                    return;
                 }
-                else
-                {
-                    StopHorizontalMovement();
-                }
-                return;
             }
 
-            if (distX <= meleeRange)
-            {
-                actionRoutine = StartCoroutine(HammerSmashRoutine());
-            }
-            else
-            {
-                actionRoutine = StartCoroutine(GroundSpikesRoutine());
-            }
+            StopHorizontalMovement();
+            if (decision.ShouldFacePlayer) FaceTarget();
         }
 
         private IEnumerator HammerSmashRoutine()
@@ -284,8 +306,9 @@ namespace StickmanBeatEmUp.Enemies
 
             Vector3 targetAim = playerTarget.position + Vector3.up * 0.85f;
             Vector2 dir = (targetAim - pos).normalized;
-            GameObject go = Instantiate(cartTurretProjectilePrefab, pos, Quaternion.identity);
-            Projectile proj = go.GetComponent<Projectile>();
+            Projectile proj = CombatObjectPool.Instance != null
+                ? CombatObjectPool.Instance.SpawnProjectile(cartTurretProjectilePrefab, pos, Quaternion.identity)
+                : Instantiate(cartTurretProjectilePrefab, pos, Quaternion.identity).GetComponent<Projectile>();
             if (proj != null)
             {
                 proj.SetSpeed(12f);

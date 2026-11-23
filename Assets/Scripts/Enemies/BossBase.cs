@@ -2,6 +2,9 @@ using System;
 using System.Collections;
 using UnityEngine;
 using StickmanBeatEmUp.Core;
+using StickmanBeatEmUp.CorePure.AI;
+using StickmanBeatEmUp.CorePure.Entities.DTOs;
+using StickmanBeatEmUp.CorePure.Interfaces;
 using StickmanBeatEmUp.Characters;
 using StickmanBeatEmUp.Economy;
 using StickmanBeatEmUp.Enemies.Stats;
@@ -32,12 +35,26 @@ namespace StickmanBeatEmUp.Enemies
         [SerializeField] protected float mapMaxX = 42f;
         [SerializeField] protected bool lockToGroundY = true;
 
+        [Header("Boss AI Strategy (GoF Strategy)")]
+        [SerializeField] protected int aiDifficultyLevel = (int)AIDifficultyPreset.Normal;
+
+        protected IAIStrategy bossStrategy;
+
         public Transform Transform => transform;
         public bool IsDead { get; protected set; }
         public float CurrentHealth { get; protected set; }
         public float MaxHealth => currentMaxHealth > 0f ? currentMaxHealth : BaseMaxHealth * runtimeHealthMult;
         protected float BaseMaxHealth => bossData != null ? bossData.maxHealth : 450f;
         public string BossName => bossData != null ? bossData.enemyName : gameObject.name;
+
+        public IAIStrategy AIStrategy => bossStrategy ?? (bossStrategy = CreateDefaultStrategy());
+        public IAIStrategy CurrentStrategy => AIStrategy;
+        public int AiDifficultyLevel
+        {
+            get => aiDifficultyLevel;
+            set => aiDifficultyLevel = AIDifficultyTuning.ClampDifficulty(value);
+        }
+        public AIDifficultyPreset AiDifficultyPreset => AIDifficultyTuning.ToPreset(aiDifficultyLevel);
 
         public virtual bool HasSuperArmor => bossData == null || bossData.hasSuperArmor;
         public virtual bool IsShielded => false;
@@ -52,6 +69,7 @@ namespace StickmanBeatEmUp.Enemies
         protected Rigidbody2D rb;
         protected Collider2D mainCol;
         protected Transform playerTarget;
+        protected BaseCharacter playerCharacter;
         protected Color originalColor = Color.white;
         protected Color baseOriginalColor = Color.white;
         protected Vector3 initialScale = Vector3.one;
@@ -81,7 +99,8 @@ namespace StickmanBeatEmUp.Enemies
 
         protected float EffectiveMoveSpeed => (bossData != null ? bossData.moveSpeed : 3.5f) * runtimeMoveSpeedMult;
         protected float EffectiveAttackSpeedMult => Mathf.Max(0.25f, runtimeAttackSpeedMult);
-        protected float EffectiveAttackCooldown(float baseCooldown) => baseCooldown / EffectiveAttackSpeedMult;
+        protected float EffectiveAttackCooldown(float baseCooldown) =>
+            (baseCooldown * AIDifficultyTuning.GetAttackCooldownScale(aiDifficultyLevel)) / EffectiveAttackSpeedMult;
         protected float EffectiveStaggerDuration(float baseDuration) => Mathf.Max(0.25f, baseDuration * runtimeStaggerMult);
         protected float ScaleOutgoingDamage(float rawDamage) => rawDamage * runtimeDamageMult;
 
@@ -120,6 +139,11 @@ namespace StickmanBeatEmUp.Enemies
                 int pLayer = LayerMask.NameToLayer("Player");
                 playerLayer = pLayer >= 0 ? (1 << pLayer) : ~0;
             }
+
+            if (bossStrategy == null)
+            {
+                bossStrategy = CreateDefaultStrategy();
+            }
         }
 
         protected virtual void Start()
@@ -140,6 +164,87 @@ namespace StickmanBeatEmUp.Enemies
             {
                 animator.speed = runtimeAttackSpeedMult;
             }
+        }
+
+        public void SetAIStrategy(IAIStrategy strategy)
+        {
+            if (strategy != null)
+            {
+                bossStrategy = strategy;
+            }
+        }
+
+        public void SetStrategy(IAIStrategy strategy)
+        {
+            SetAIStrategy(strategy);
+        }
+
+        public void SetStrategyById(string strategyId)
+        {
+            bossStrategy = AIStrategyRegistry.Default.Resolve(strategyId, aiDifficultyLevel);
+        }
+
+        public void SetDifficulty(AIDifficultyPreset difficulty)
+        {
+            aiDifficultyLevel = (int)difficulty;
+        }
+
+        public void SetDifficulty(int difficultyLevel)
+        {
+            aiDifficultyLevel = AIDifficultyTuning.ClampDifficulty(difficultyLevel);
+        }
+
+        protected virtual IAIStrategy CreateDefaultStrategy()
+        {
+            return new BossPhaseStrategy();
+        }
+
+        protected virtual EnemyAIContext BuildBossAIContext()
+        {
+            return BuildBossAIContext(0f, 0f, 0);
+        }
+
+        protected EnemyAIContext BuildBossAIContext(float currentRage, float cooldownRemaining, int lightHitsWindow = 0)
+        {
+            BaseCharacter targetChar = playerCharacter;
+            if (targetChar == null && playerTarget != null)
+            {
+                targetChar = playerTarget.GetComponent<BaseCharacter>();
+                playerCharacter = targetChar;
+            }
+
+            bool isTargetAttacking = targetChar != null &&
+                (targetChar.CurrentState == CharacterState.Attack || targetChar.CurrentState == CharacterState.Skill);
+
+            return new EnemyAIContext
+            {
+                EnemyX = transform.position.x,
+                EnemyY = transform.position.y,
+                PlayerX = playerTarget != null ? playerTarget.position.x : transform.position.x,
+                PlayerY = playerTarget != null ? playerTarget.position.y : transform.position.y,
+                EnemyHp = CurrentHealth,
+                EnemyMaxHp = MaxHealth,
+                EnemyRage = currentRage,
+                AttackRange = bossData != null ? bossData.attackRange : 2.3f,
+                PreferredRange = bossData != null ? bossData.preferredRange : 8.5f,
+                FleeRange = bossData != null ? bossData.fleeDistance : 2.0f,
+                AttackCooldownRemaining = Mathf.Max(0f, cooldownRemaining),
+                IsPlayerDead = targetChar != null && targetChar.IsDead,
+                IsPlayerAttacking = isTargetAttacking,
+                LightHitsReceivedInWindow = lightHitsWindow,
+                DeltaTime = Time.deltaTime,
+                DifficultyLevel = aiDifficultyLevel
+            };
+        }
+
+        public virtual void ApplyCampaignScaling(float hpMultiplier, float damageMultiplier)
+        {
+            runtimeHealthMult = Mathf.Max(0.1f, hpMultiplier);
+            runtimeDamageMult = Mathf.Max(0.1f, damageMultiplier);
+            currentMaxHealth = BaseMaxHealth * runtimeHealthMult;
+            CurrentHealth = currentMaxHealth;
+            OnEndlessModifiersApplied();
+            NotifyHealthChanged();
         }
 
         public void SetData(EnemyDataSO data)
@@ -282,6 +387,7 @@ namespace StickmanBeatEmUp.Enemies
         protected void FindPlayerTarget()
         {
             BaseCharacter player = FindAnyObjectByType<BaseCharacter>();
+            playerCharacter = player;
             if (player != null) playerTarget = player.transform;
         }
 

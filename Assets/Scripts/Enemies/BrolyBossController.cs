@@ -1,6 +1,7 @@
 using System.Collections;
 using UnityEngine;
 using StickmanBeatEmUp.Core;
+using StickmanBeatEmUp.CorePure.Entities.DTOs;
 using StickmanBeatEmUp.Level;
 using StickmanBeatEmUp.UI;
 using StickmanGame.VFX;
@@ -47,55 +48,89 @@ namespace StickmanBeatEmUp.Enemies
             NotifyStatusChanged("LEGENDARY SUPER SAIYAN BROLY!");
         }
 
+        protected override EnemyAIContext BuildBossAIContext()
+        {
+            float distX = playerTarget != null ? Mathf.Abs(playerTarget.position.x - transform.position.x) : 0f;
+            float meleeRange = bossData != null ? bossData.attackRange : 2.3f;
+            float effectiveRage = hasGreenShield ? 0f : rage;
+            float relevantNextTime = distX <= meleeRange ? nextAttackTime : nextSpecialTime;
+            return BuildBossAIContext(effectiveRage, Mathf.Max(0f, relevantNextTime - Time.time), 0);
+        }
+
         protected override void TickBossAI()
         {
-            float dx = playerTarget.position.x - transform.position.x;
-            float distX = Mathf.Abs(dx);
-            float meleeRange = bossData != null ? bossData.attackRange : 2.3f;
+            float distX = Mathf.Abs(playerTarget.position.x - transform.position.x);
+            AIActionDecision decision = AIStrategy.ComputeAction(BuildBossAIContext());
 
-            // Activate Green Ki Shield whenever Rage fills to 100
-            if (!hasGreenShield && rage >= maxRage)
+            // Activate Green Ki Shield whenever strategy requests shield (e.g. Rage >= 100 or custom OCP strategy)
+            if (decision.ShouldActivateShield && !hasGreenShield &&
+                (rage >= maxRage || decision.ActionType == AIActionType.SpecialPhase))
             {
                 ActivateGreenKiShield();
                 actionRoutine = StartCoroutine(RoarRoutine());
                 return;
             }
 
-            if (Time.time >= nextSpecialTime && distX >= 2.2f)
+            switch (decision.ActionType)
             {
-                bool useSlam = distX <= 4.2f && UnityEngine.Random.value > 0.45f;
-                actionRoutine = StartCoroutine(useSlam ? GiganticSlamRoutine() : LariatChargeRoutine());
-                return;
-            }
+                case AIActionType.SpecialPhase:
+                    if (Time.time >= nextSpecialTime)
+                    {
+                        bool useSlam = distX <= 4.2f && (distX < 2.2f || UnityEngine.Random.value > 0.45f);
+                        actionRoutine = StartCoroutine(useSlam ? GiganticSlamRoutine() : LariatChargeRoutine());
+                        return;
+                    }
+                    break;
 
-            if (distX <= meleeRange)
-            {
-                StopHorizontalMovement();
-                FaceTarget();
-                if (Time.time >= nextAttackTime)
+                case AIActionType.HeavyAttack:
+                    if (Time.time >= nextAttackTime)
+                    {
+                        StopHorizontalMovement();
+                        FaceTarget();
+                        actionRoutine = StartCoroutine(GiganticSlamRoutine());
+                        return;
+                    }
+                    break;
+
+                case AIActionType.LightAttack:
+                    if (Time.time >= nextAttackTime)
+                    {
+                        StopHorizontalMovement();
+                        FaceTarget();
+                        actionRoutine = StartCoroutine(HeavyStompMeleeRoutine());
+                        return;
+                    }
+                    break;
+
+                case AIActionType.ParryCounter:
+                    if (Time.time >= nextAttackTime)
+                    {
+                        actionRoutine = StartCoroutine(RoarRoutine());
+                        return;
+                    }
+                    break;
+
+                case AIActionType.MoveTowardPlayer:
+                case AIActionType.MoveAwayFromPlayer:
                 {
-                    bool useHeavy = UnityEngine.Random.value > 0.5f;
-                    actionRoutine = StartCoroutine(useHeavy ? GiganticSlamRoutine() : HeavyStompMeleeRoutine());
-                }
-                else
-                {
+                    float spd = EffectiveMoveSpeed * Mathf.Clamp(Mathf.Abs(decision.MoveDirectionX), 0.7f, 1.35f);
+                    float moveSign = decision.MoveDirectionX >= 0f ? 1f : -1f;
+                    if (decision.ShouldFacePlayer) FaceTarget();
+                    if (rb != null) rb.linearVelocity = new Vector2(moveSign * spd, rb.linearVelocity.y);
                     SetAnimState(0);
-                }
-            }
-            else
-            {
-                // Heavy stomp advance with periodic camera tremor
-                float spd = EffectiveMoveSpeed;
-                FaceTarget();
-                if (rb != null) rb.linearVelocity = new Vector2(Mathf.Sign(dx) * spd, rb.linearVelocity.y);
-                SetAnimState(0);
 
-                if (Time.time >= nextStompShakeTime)
-                {
-                    nextStompShakeTime = Time.time + 0.55f;
-                    CameraFollowBeatEmUp.Instance?.Shake(0.12f, 0.14f);
+                    if (decision.ActionType == AIActionType.MoveTowardPlayer && Time.time >= nextStompShakeTime)
+                    {
+                        nextStompShakeTime = Time.time + 0.55f;
+                        CameraFollowBeatEmUp.Instance?.Shake(0.12f, 0.14f);
+                    }
+                    return;
                 }
             }
+
+            StopHorizontalMovement();
+            if (decision.ShouldFacePlayer) FaceTarget();
+            SetAnimState(0);
         }
 
         private IEnumerator HeavyStompMeleeRoutine()

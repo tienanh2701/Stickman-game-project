@@ -1,6 +1,9 @@
 using System.Collections;
 using UnityEngine;
 using StickmanBeatEmUp.Core;
+using StickmanBeatEmUp.CorePure.AI;
+using StickmanBeatEmUp.CorePure.Entities.DTOs;
+using StickmanBeatEmUp.CorePure.Interfaces;
 using StickmanBeatEmUp.Level;
 using StickmanBeatEmUp.UI;
 using StickmanGame.VFX;
@@ -304,24 +307,60 @@ namespace StickmanBeatEmUp.Enemies
             }
         }
 
+        protected override IAIStrategy CreateDefaultStrategy()
+        {
+            return new BossPhaseStrategy(defaultMeleeRange: 3.5f, specialTriggerMinRange: 3.5f, rageShieldThreshold: 100f);
+        }
+
+        protected override EnemyAIContext BuildBossAIContext()
+        {
+            EnemyAIContext ctx = BuildBossAIContext(0f, Mathf.Max(0f, nextAttackTime - Time.time), 0);
+            ctx.AttackRange = Mathf.Max(ctx.AttackRange, 4.2f);
+            ctx.PreferredRange = Mathf.Max(ctx.PreferredRange, 18f);
+            return ctx;
+        }
+
         protected override void TickBossAI()
         {
-            if (Time.time < nextAttackTime) return;
+            AIActionDecision decision = AIStrategy.ComputeAction(BuildBossAIContext());
 
             bool leftAlive = leftArm != null && !leftArm.IsDead;
             bool rightAlive = rightArm != null && !rightArm.IsDead;
+            bool anyArmAlive = leftAlive || rightAlive;
 
-            if (leftAlive || rightAlive)
+            switch (decision.ActionType)
             {
-                // Both/either arm alive: can do Normal Smash (15 DMG) OR Laser Sweep (20 DMG)
-                bool useLaser = UnityEngine.Random.value > 0.45f;
-                actionRoutine = StartCoroutine(useLaser ? RightArmLaserSweepRoutine() : RocketArmPunchRoutine());
-            }
-            else
-            {
-                // Both arms destroyed: Laser is permanently disabled, only use 15 DMG Normal Smash / Core Pulse!
-                bool usePulse = UnityEngine.Random.value > 0.45f;
-                actionRoutine = StartCoroutine(usePulse ? CoreOverdrivePulseRoutine() : RocketArmPunchRoutine());
+                case AIActionType.SpecialPhase:
+                case AIActionType.RangedVolley:
+                    if (Time.time < nextAttackTime) return;
+                    actionRoutine = StartCoroutine(anyArmAlive ? RightArmLaserSweepRoutine() : CoreOverdrivePulseRoutine());
+                    break;
+
+                case AIActionType.HeavyAttack:
+                    if (Time.time < nextAttackTime) return;
+                    if (anyArmAlive)
+                    {
+                        bool useLaser = UnityEngine.Random.value > 0.45f;
+                        actionRoutine = StartCoroutine(useLaser ? RightArmLaserSweepRoutine() : RocketArmPunchRoutine());
+                    }
+                    else
+                    {
+                        actionRoutine = StartCoroutine(CoreOverdrivePulseRoutine());
+                    }
+                    break;
+
+                case AIActionType.LightAttack:
+                case AIActionType.ParryCounter:
+                    if (Time.time < nextAttackTime) return;
+                    actionRoutine = StartCoroutine(RocketArmPunchRoutine());
+                    break;
+
+                case AIActionType.MoveTowardPlayer:
+                case AIActionType.MoveAwayFromPlayer:
+                default:
+                    // Giant Mecha remains anchored in place while facing the player between attacks
+                    if (decision.ShouldFacePlayer) FaceTarget();
+                    break;
             }
         }
 
@@ -378,8 +417,9 @@ namespace StickmanBeatEmUp.Enemies
                 {
                     Vector2 baseDir = (targetAim - origin).normalized;
                     Vector2 dir = Quaternion.Euler(0f, 0f, i * 10f) * baseDir;
-                    GameObject go = Instantiate(armLaserProjectilePrefab, origin, Quaternion.identity);
-                    Projectile proj = go.GetComponent<Projectile>();
+                    Projectile proj = CombatObjectPool.Instance != null
+                        ? CombatObjectPool.Instance.SpawnProjectile(armLaserProjectilePrefab, origin, Quaternion.identity)
+                        : Instantiate(armLaserProjectilePrefab, origin, Quaternion.identity).GetComponent<Projectile>();
                     if (proj != null)
                     {
                         proj.SetSpeed(12.5f);
