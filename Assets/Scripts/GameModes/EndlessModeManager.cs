@@ -5,8 +5,12 @@ using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 using StickmanBeatEmUp.Core;
+using StickmanBeatEmUp.CorePure.Entities.DTOs;
+using StickmanBeatEmUp.CorePure.Interfaces;
+using StickmanBeatEmUp.CorePure.Patterns.Factories;
 using StickmanBeatEmUp.Characters;
 using StickmanBeatEmUp.Enemies;
+using StickmanBeatEmUp.Enemies.Stats;
 using StickmanBeatEmUp.Level;
 using StickmanBeatEmUp.UI;
 
@@ -15,43 +19,13 @@ namespace StickmanBeatEmUp.GameModes
     /// <summary>
     /// Endless Mode loop manager:
     /// - Full Attack on Titan arena [-22 .. 42], groundY = -2.5
-    /// - Categorized 3-World pools (Melee Creeps, Ranged Creeps, Elites, Bosses) with Zero-Null fallback
+    /// - Categorized 3-World pools (Melee Creeps, Ranged Creeps, Elites, Bosses) backed by EndlessEnemyCatalogSO & Zero-Null fallback
     /// - Wave progression with 3s rest +10 HP between cleared waves
-    /// - Per-instance enemy scaling (HP +3%/w, DMG +1.5%/w cap 1.75x, Speed +0.8%/w cap 1.25x, Tenacity -20% stagger at W10+, Red Aura Enraged 15% at W15+, Adaptive Armor DR 10%-25% & 1.12x speed at W20+; gentle Boss tier scaling every 5 waves)
+    /// - Per-instance enemy scaling via WorldEnemyFactory (IEnemyFactory) & CombatObjectPool recycling
     /// - Escalating Creeps, Elites (Wave 3+ every 2 waves), and World Bosses every 5 waves (Wave 5, 10, 15...)
     /// </summary>
     public class EndlessModeManager : MonoBehaviour
     {
-#if UNITY_EDITOR
-        private static readonly string[] CanonicalMeleeCreepPaths =
-        {
-            "Assets/Prefabs/Enemies/World1_AoT/W1_Creep_PureTitan.prefab",
-            "Assets/Prefabs/Enemies/World2_DB/W2_Creep_Saibamen.prefab",
-            "Assets/Prefabs/Enemies/World3_Diend/W3_Creep_Shocker.prefab"
-        };
-
-        private static readonly string[] CanonicalRangedCreepPaths =
-        {
-            "Assets/Prefabs/Enemies/World1_AoT/W1_Range_BeastTitan.prefab",
-            "Assets/Prefabs/Enemies/World2_DB/W2_Range_FriezaSoldier.prefab",
-            "Assets/Prefabs/Enemies/World3_Diend/W3_Range_Kasshin.prefab"
-        };
-
-        private static readonly string[] CanonicalElitePaths =
-        {
-            "Assets/Prefabs/Enemies/World1_AoT/W1_Elite_FemaleTitan.prefab",
-            "Assets/Prefabs/Enemies/World2_DB/W2_Elite_Nappa.prefab",
-            "Assets/Prefabs/Enemies/World3_Diend/W3_Elite_ShadowMoon.prefab"
-        };
-
-        private static readonly string[] CanonicalBossPaths =
-        {
-            "Assets/Prefabs/Enemies/World1_AoT/W1_Boss_WarHammer.prefab",
-            "Assets/Prefabs/Enemies/World2_DB/W2_Boss_Broly.prefab",
-            "Assets/Prefabs/Enemies/World3_Diend/W3_Boss_MechaColossus.prefab"
-        };
-#endif
-
         [Header("Arena Bounds")]
         [SerializeField] private float arenaMinX = -22f;
         [SerializeField] private float arenaMaxX = 42f;
@@ -61,6 +35,13 @@ namespace StickmanBeatEmUp.GameModes
         [SerializeField] private float restDuration = 3.0f;
         [SerializeField] private float waveHealAmount = 10f;
         [SerializeField] private float spawnStaggerDelay = 0.16f;
+
+        [Header("Catalog Registry (Zero Hardcoded Paths)")]
+        [SerializeField] private EndlessEnemyCatalogSO enemyCatalog;
+        [SerializeField] private string catalogResourcePath = "EndlessPrefabs/EndlessEnemyCatalog";
+
+        [Header("Object Pooling")]
+        [SerializeField] private bool useCombatObjectPool = true;
 
         [Header("Endless Categorized Pools")]
         [SerializeField] private List<GameObject> meleeCreeps = new List<GameObject>();
@@ -83,6 +64,8 @@ namespace StickmanBeatEmUp.GameModes
         private bool hasExplicitCategorizedConfig;
 
         private readonly List<GameObject> activeEnemies = new List<GameObject>();
+        private readonly WorldEnemyFactory defaultEnemyFactory = new WorldEnemyFactory();
+        private IEnemyFactory enemyFactory;
 
         private GameObject restBannerObj;
         private TextMeshProUGUI restBannerText;
@@ -92,6 +75,17 @@ namespace StickmanBeatEmUp.GameModes
         public float ArenaMinX => arenaMinX;
         public float ArenaMaxX => arenaMaxX;
         public float GroundY => groundY;
+        public IEnemyFactory EnemyFactory => enemyFactory ?? defaultEnemyFactory;
+
+        public void SetEnemyFactory(IEnemyFactory factory)
+        {
+            enemyFactory = factory ?? defaultEnemyFactory;
+        }
+
+        public void SetEnemyCatalog(EndlessEnemyCatalogSO catalog)
+        {
+            enemyCatalog = catalog;
+        }
 
         public void SetArenaBounds(float minX, float maxX)
         {
@@ -283,7 +277,7 @@ namespace StickmanBeatEmUp.GameModes
         public void ApplyEndlessScaling(EnemyBase enemy, int wave)
         {
             if (enemy == null) return;
-            bool isCreep = !(enemy is EliteEnemy) && (enemy.Data == null || (!enemy.Data.isElite && !enemy.Data.isBoss));
+            bool isCreep = !enemy.IsEliteOrBoss;
             ApplyEndlessScaling(enemy, wave, isCreep);
         }
 
@@ -301,6 +295,17 @@ namespace StickmanBeatEmUp.GameModes
                 out float damageReduction,
                 out float attackSpeedMult);
 
+            EnemyBlueprint blueprint = TryCreateEndlessBlueprint(enemy.gameObject, enemy.Data, null, w);
+            if (blueprint != null)
+            {
+                if (blueprint.healthMultiplier > 0f) hpMult = blueprint.healthMultiplier;
+                if (blueprint.damageMultiplier > 0f) dmgMult = blueprint.damageMultiplier;
+                if (!string.IsNullOrWhiteSpace(blueprint.strategyId))
+                {
+                    enemy.SetStrategyById(blueprint.strategyId);
+                }
+            }
+
             bool isEnraged = isCreep && w >= 15 && UnityEngine.Random.value < 0.15f;
 
             enemy.ApplyEndlessModifiers(
@@ -317,14 +322,26 @@ namespace StickmanBeatEmUp.GameModes
         {
             if (boss == null) return;
 
+            int w = Mathf.Max(1, wave);
             ComputeBossWaveScaling(
-                wave,
+                w,
                 out float bossHpMult,
                 out float bossDmgMult,
                 out float bossSpeedMult,
                 out float bossStaggerMult,
                 out float bossDrPct,
                 out float bossAtkSpd);
+
+            EnemyBlueprint blueprint = TryCreateEndlessBlueprint(boss.gameObject, null, boss.BossName, w);
+            if (blueprint != null)
+            {
+                if (blueprint.healthMultiplier > 0f) bossHpMult = blueprint.healthMultiplier;
+                if (blueprint.damageMultiplier > 0f) bossDmgMult = blueprint.damageMultiplier;
+                if (!string.IsNullOrWhiteSpace(blueprint.strategyId))
+                {
+                    boss.SetStrategyById(blueprint.strategyId);
+                }
+            }
 
             boss.ApplyEndlessModifiers(
                 bossHpMult,
@@ -334,6 +351,58 @@ namespace StickmanBeatEmUp.GameModes
                 bossDrPct,
                 bossAtkSpd,
                 false);
+        }
+
+        private EnemyBlueprint TryCreateEndlessBlueprint(GameObject sourceObj, EnemyDataSO data, string fallbackName, int wave)
+        {
+            string canonicalId = null;
+            if (data != null && !string.IsNullOrWhiteSpace(data.enemyName))
+            {
+                canonicalId = defaultEnemyFactory.ResolveCanonicalEnemyId(data.enemyName);
+            }
+            if (string.IsNullOrEmpty(canonicalId) && !string.IsNullOrWhiteSpace(fallbackName))
+            {
+                canonicalId = defaultEnemyFactory.ResolveCanonicalEnemyId(fallbackName);
+            }
+            if (string.IsNullOrEmpty(canonicalId) && sourceObj != null)
+            {
+                canonicalId = defaultEnemyFactory.ResolveCanonicalEnemyId(sourceObj.name);
+            }
+
+            if (string.IsNullOrEmpty(canonicalId))
+            {
+                return null;
+            }
+
+            IEnemyFactory factory = EnemyFactory;
+            if (factory == null || !factory.CanCreate(canonicalId))
+            {
+                return null;
+            }
+
+            int worldIndex = ResolveWorldIndex(data, canonicalId);
+            return factory.CreateEnemyBlueprint(canonicalId, worldIndex, Mathf.Max(1, wave), true);
+        }
+
+        private static int ResolveWorldIndex(EnemyDataSO data, string canonicalId)
+        {
+            if (data != null)
+            {
+                switch (data.worldTheme)
+                {
+                    case WorldType.World1_RuinedCity: return 1;
+                    case WorldType.World2_Wasteland: return 2;
+                    case WorldType.World3_NeoCity: return 3;
+                }
+            }
+
+            if (!string.IsNullOrEmpty(canonicalId))
+            {
+                if (canonicalId.StartsWith("w2_", StringComparison.OrdinalIgnoreCase)) return 2;
+                if (canonicalId.StartsWith("w3_", StringComparison.OrdinalIgnoreCase)) return 3;
+            }
+
+            return 1;
         }
 
         private static void ComputeWaveScaling(
@@ -588,7 +657,19 @@ namespace StickmanBeatEmUp.GameModes
 
             bool isTetherBoss = isBossSpawn && prefab.GetComponent<TetherBossController>() != null;
             Vector3 spawnPos = ComputeCameraEdgeSpawnPosition(isTetherBoss);
-            GameObject obj = Instantiate(prefab, spawnPos, Quaternion.identity);
+
+            GameObject obj;
+            if (useCombatObjectPool && !isBossSpawn && prefab.GetComponent<EnemyBase>() != null)
+            {
+                CombatObjectPool pool = CombatObjectPool.EnsureInstance();
+                EnemyBase pooledEnemy = pool != null ? pool.SpawnEnemy(prefab, spawnPos, Quaternion.identity) : null;
+                obj = pooledEnemy != null ? pooledEnemy.gameObject : Instantiate(prefab, spawnPos, Quaternion.identity);
+            }
+            else
+            {
+                obj = Instantiate(prefab, spawnPos, Quaternion.identity);
+            }
+
             pendingSpawnCount = Mathf.Max(0, pendingSpawnCount - 1);
 
             BossBase boss = obj.GetComponent<BossBase>();
@@ -608,7 +689,7 @@ namespace StickmanBeatEmUp.GameModes
                 ApplyEndlessScaling(enemy, wave);
                 activeEnemies.Add(obj);
                 enemy.OnDied += HandleEnemyBaseDefeated;
-                if (enemy is EliteEnemy || (enemy.Data != null && enemy.Data.isElite))
+                if (enemy.IsEliteOrBoss)
                 {
                     if (levelManager != null)
                     {
@@ -628,7 +709,7 @@ namespace StickmanBeatEmUp.GameModes
             {
                 activeEnemies.Add(obj);
                 legacy.OnDeathEvent += HandleLegacyEnemyDefeated;
-                if (legacy is BossController)
+                if (obj.GetComponent<BossController>() != null)
                 {
                     levelManager?.NotifyBossSpawned(legacy);
                 }
@@ -720,7 +801,7 @@ namespace StickmanBeatEmUp.GameModes
                 }
 
                 EnemyBase eb = go.GetComponent<EnemyBase>();
-                if (eb != null && eb.IsDead)
+                if (eb != null && (eb.IsDead || !go.activeInHierarchy))
                 {
                     eb.OnDied -= HandleEnemyBaseDefeated;
                     activeEnemies.RemoveAt(i);
@@ -729,7 +810,7 @@ namespace StickmanBeatEmUp.GameModes
                 }
 
                 BossBase bb = go.GetComponent<BossBase>();
-                if (bb != null && bb.IsDead)
+                if (bb != null && (bb.IsDead || !go.activeInHierarchy))
                 {
                     bb.OnBossDefeated -= HandleBossDefeated;
                     activeEnemies.RemoveAt(i);
@@ -738,7 +819,7 @@ namespace StickmanBeatEmUp.GameModes
                 }
 
                 BaseEnemy be = go.GetComponent<BaseEnemy>();
-                if (be != null && be.IsDead)
+                if (be != null && (be.IsDead || !go.activeInHierarchy))
                 {
                     be.OnDeathEvent -= HandleLegacyEnemyDefeated;
                     activeEnemies.RemoveAt(i);
@@ -822,7 +903,24 @@ namespace StickmanBeatEmUp.GameModes
                 ClassifyAndAddCategorizedPrefab(snapshot[i], meleeCreeps, rangedCreeps, elites, bosses);
             }
 
-            // 2. Scan LevelManager.AllStages & StageManager.AllLevels across all 12 levels (3 Worlds)
+            // 2. Supplement from serialized EndlessEnemyCatalogSO or Resources catalog (works in Editor and Builds)
+            if (AnyCategoryEmpty())
+            {
+                EndlessEnemyCatalogSO resolvedCatalog = enemyCatalog != null
+                    ? enemyCatalog
+                    : (!string.IsNullOrEmpty(catalogResourcePath)
+                        ? Resources.Load<EndlessEnemyCatalogSO>(catalogResourcePath)
+                        : null);
+                if (resolvedCatalog != null && resolvedCatalog.HasAnyPrefabs)
+                {
+                    if (meleeCreeps.Count == 0) AddUniqueValid(meleeCreeps, resolvedCatalog.meleeCreeps);
+                    if (rangedCreeps.Count == 0) AddUniqueValid(rangedCreeps, resolvedCatalog.rangedCreeps);
+                    if (elites.Count == 0) AddUniqueValid(elites, resolvedCatalog.elites);
+                    if (bosses.Count == 0) AddUniqueValid(bosses, resolvedCatalog.bosses);
+                }
+            }
+
+            // 3. Scan LevelManager.AllStages & StageManager.AllLevels across all 12 levels (3 Worlds)
             if (AnyCategoryEmpty() || !hasExplicitCategorizedConfig)
             {
                 List<GameObject> harvestedMelee = new List<GameObject>();
@@ -846,7 +944,7 @@ namespace StickmanBeatEmUp.GameModes
                 {
                     foreach (LevelDataSO lvl in stageManager.AllLevels)
                     {
-                        CollectPrefabsFromStage(lvl, harvestedMelee, harvestedRanged, harvestedElites, harvestedBosses);
+                        CollectPrefabsFromLevel(lvl, harvestedMelee, harvestedRanged, harvestedElites, harvestedBosses);
                     }
                 }
 
@@ -856,7 +954,7 @@ namespace StickmanBeatEmUp.GameModes
                 if (bosses.Count == 0) AddUniqueValid(bosses, harvestedBosses);
             }
 
-            // 3. Load from Resources/EndlessPrefabs if present at runtime
+            // 4. Load from Resources/EndlessPrefabs if present at runtime
             if (AnyCategoryEmpty())
             {
                 GameObject[] resourcePrefabs = Resources.LoadAll<GameObject>("EndlessPrefabs");
@@ -879,15 +977,7 @@ namespace StickmanBeatEmUp.GameModes
                 }
             }
 
-            // 4. Editor safety fallback: directly load canonical 12 prefabs if any pool is still empty
-#if UNITY_EDITOR
-            if (meleeCreeps.Count == 0) LoadCanonicalPrefabs(CanonicalMeleeCreepPaths, meleeCreeps);
-            if (rangedCreeps.Count == 0) LoadCanonicalPrefabs(CanonicalRangedCreepPaths, rangedCreeps);
-            if (elites.Count == 0) LoadCanonicalPrefabs(CanonicalElitePaths, elites);
-            if (bosses.Count == 0) LoadCanonicalPrefabs(CanonicalBossPaths, bosses);
-#endif
-
-            // Final creep pool cross-fallback so wave spawning never stalls even in stripped test scenes
+            // 5. Final creep pool cross-fallback so wave spawning never stalls even in stripped test scenes
             if (meleeCreeps.Count == 0 && rangedCreeps.Count > 0) AddUniqueValid(meleeCreeps, rangedCreeps);
             if (rangedCreeps.Count == 0 && meleeCreeps.Count > 0) AddUniqueValid(rangedCreeps, meleeCreeps);
 
@@ -898,20 +988,6 @@ namespace StickmanBeatEmUp.GameModes
         {
             return meleeCreeps.Count == 0 || rangedCreeps.Count == 0 || elites.Count == 0 || bosses.Count == 0;
         }
-
-#if UNITY_EDITOR
-        private static void LoadCanonicalPrefabs(string[] assetPaths, List<GameObject> target)
-        {
-            for (int i = 0; i < assetPaths.Length; i++)
-            {
-                GameObject prefab = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>(assetPaths[i]);
-                if (prefab != null && !target.Contains(prefab))
-                {
-                    target.Add(prefab);
-                }
-            }
-        }
-#endif
 
         private void SyncLegacyArraysFromCategorized()
         {
@@ -986,13 +1062,21 @@ namespace StickmanBeatEmUp.GameModes
             }
 
             ClassifyAndAddCategorizedPrefab(stage.bossPrefab, melee, ranged, eliteList, bossList);
+        }
 
-            if (stage is LevelDataSO levelData)
-            {
-                ClassifyAndAddCategorizedPrefab(levelData.supportMeleeCreepPrefab, melee, ranged, eliteList, bossList);
-                ClassifyAndAddCategorizedPrefab(levelData.supportRangedCreepPrefab, melee, ranged, eliteList, bossList);
-                ClassifyAndAddCategorizedPrefab(levelData.supportElitePrefab, melee, ranged, eliteList, bossList);
-            }
+        private static void CollectPrefabsFromLevel(
+            LevelDataSO levelData,
+            List<GameObject> melee,
+            List<GameObject> ranged,
+            List<GameObject> eliteList,
+            List<GameObject> bossList)
+        {
+            if (levelData == null) return;
+
+            CollectPrefabsFromStage(levelData, melee, ranged, eliteList, bossList);
+            ClassifyAndAddCategorizedPrefab(levelData.supportMeleeCreepPrefab, melee, ranged, eliteList, bossList);
+            ClassifyAndAddCategorizedPrefab(levelData.supportRangedCreepPrefab, melee, ranged, eliteList, bossList);
+            ClassifyAndAddCategorizedPrefab(levelData.supportElitePrefab, melee, ranged, eliteList, bossList);
         }
 
         private static void ClassifyAndAddCategorizedPrefab(
@@ -1013,13 +1097,13 @@ namespace StickmanBeatEmUp.GameModes
             EnemyBase eb = prefab.GetComponent<EnemyBase>();
             if (eb != null)
             {
-                if (eb is EliteEnemy || (eb.Data != null && eb.Data.isElite))
+                if (eb.IsEliteOrBoss)
                 {
                     if (!eliteList.Contains(prefab)) eliteList.Add(prefab);
                     return;
                 }
 
-                if (eb is RangedCreep || (eb.Data != null && eb.Data.attackRange >= 3.5f))
+                if (prefab.GetComponent<RangedCreep>() != null || (eb.Data != null && eb.Data.attackRange >= 3.5f))
                 {
                     if (!ranged.Contains(prefab)) ranged.Add(prefab);
                     return;
@@ -1032,11 +1116,11 @@ namespace StickmanBeatEmUp.GameModes
             BaseEnemy be = prefab.GetComponent<BaseEnemy>();
             if (be != null)
             {
-                if (be is EliteBruiserEnemy)
+                if (prefab.GetComponent<EliteBruiserEnemy>() != null)
                 {
                     if (!eliteList.Contains(prefab)) eliteList.Add(prefab);
                 }
-                else if (be is RangerEnemy)
+                else if (prefab.GetComponent<RangerEnemy>() != null)
                 {
                     if (!ranged.Contains(prefab)) ranged.Add(prefab);
                 }

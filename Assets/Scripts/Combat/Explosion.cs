@@ -1,3 +1,5 @@
+using System;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using StickmanBeatEmUp.Core;
@@ -7,7 +9,7 @@ namespace StickmanBeatEmUp.Combat
     /// <summary>
     /// Vùng nổ diện rộng AOE (Dùng cho Nổ Ki của Goku, Genki Dama, Bom Tự Sát Kamikaze, Thunder Spear)
     /// </summary>
-    public class Explosion : MonoBehaviour
+    public class Explosion : MonoBehaviour, IPoolableCombatObject
     {
         [Header("Explosion Settings")]
         [SerializeField] private float radius = 3f;
@@ -23,6 +25,40 @@ namespace StickmanBeatEmUp.Combat
 
         private GameObject sourceAttacker;
         private bool hasTriggered = false;
+        private Action<Explosion> returnToPoolCallback;
+        private Coroutine despawnRoutine;
+
+        public void SetReturnToPoolCallback(Action<Explosion> callback)
+        {
+            returnToPoolCallback = callback;
+        }
+
+        public void SetPoolReturnAction(Action<Explosion> callback)
+        {
+            returnToPoolCallback = callback;
+        }
+
+        public void OnSpawnedFromPool()
+        {
+            hasTriggered = false;
+            sourceAttacker = null;
+            if (despawnRoutine != null)
+            {
+                StopCoroutine(despawnRoutine);
+                despawnRoutine = null;
+            }
+        }
+
+        public void OnReturnedToPool()
+        {
+            hasTriggered = false;
+            sourceAttacker = null;
+            if (despawnRoutine != null)
+            {
+                StopCoroutine(despawnRoutine);
+                despawnRoutine = null;
+            }
+        }
 
         public void Setup(float customDamage, float customRadius, LayerMask targetMask, GameObject attacker, AttackType type, bool breaksArmor)
         {
@@ -90,7 +126,32 @@ namespace StickmanBeatEmUp.Combat
                 }
             }
 
+            ScheduleReleaseOrDestroy();
+        }
+
+        private void ScheduleReleaseOrDestroy()
+        {
+            if (returnToPoolCallback != null)
+            {
+                if (despawnRoutine != null)
+                {
+                    StopCoroutine(despawnRoutine);
+                }
+                despawnRoutine = StartCoroutine(ReleaseAfterDurationRoutine());
+                return;
+            }
+
             Destroy(gameObject, duration);
+        }
+
+        private IEnumerator ReleaseAfterDurationRoutine()
+        {
+            if (duration > 0f)
+            {
+                yield return new WaitForSeconds(duration);
+            }
+            despawnRoutine = null;
+            returnToPoolCallback?.Invoke(this);
         }
 
         private void OnDrawGizmosSelected()

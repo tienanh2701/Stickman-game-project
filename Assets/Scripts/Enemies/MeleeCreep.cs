@@ -1,12 +1,16 @@
 using System.Collections;
 using UnityEngine;
 using StickmanBeatEmUp.Core;
+using StickmanBeatEmUp.CorePure.AI;
+using StickmanBeatEmUp.CorePure.Entities.DTOs;
+using StickmanBeatEmUp.CorePure.Interfaces;
 
 namespace StickmanBeatEmUp.Enemies
 {
     /// <summary>
     /// Standard close-combat Creep (Pure Titan, Frieza Soldier, Shocker Combatman, optional Saibaman Kamikaze).
     /// Shares the trimmed BaseCreep Animator layout: 0=Move, 1=Attack1 (with windup merged), 2=Attack2, 3=Hit, 4=Death.
+    /// Delegates chase/attack/detonate decisions to the injected IAIStrategy (GoF Strategy).
     /// </summary>
     public class MeleeCreep : EnemyBase
     {
@@ -18,43 +22,67 @@ namespace StickmanBeatEmUp.Enemies
 
         private bool flipAttackToggle;
 
+        protected override IAIStrategy CreateDefaultStrategy()
+        {
+            if (isKamikaze)
+            {
+                return new KamikazeRushStrategy();
+            }
+
+            return new MeleeChaseStrategy();
+        }
+
+        public override void ResetForPoolSpawn()
+        {
+            flipAttackToggle = false;
+            base.ResetForPoolSpawn();
+        }
+
         protected override void TickBehavior()
         {
-            float distX = Mathf.Abs(playerTarget.position.x - transform.position.x);
-            float distY = Mathf.Abs(playerTarget.position.y - transform.position.y);
-            float range = enemyData != null ? enemyData.attackRange : 1.45f;
+            AIActionDecision decision = AIStrategy.ComputeAction(BuildAIContext());
 
-            if (distX <= range && distY <= 1.8f)
+            switch (decision.ActionType)
             {
-                StopHorizontalMovement();
-                FaceTarget();
+                case AIActionType.Detonate:
+                    StopHorizontalMovement();
+                    if (decision.ShouldFacePlayer) FaceTarget();
+                    actionRoutine = StartCoroutine(KamikazeRoutine());
+                    break;
 
-                if (Time.time >= nextAttackTime)
+                case AIActionType.HeavyAttack:
+                    StopHorizontalMovement();
+                    if (decision.ShouldFacePlayer) FaceTarget();
+                    actionRoutine = StartCoroutine(isKamikaze ? KamikazeRoutine() : MeleeAttackRoutine(true));
+                    break;
+
+                case AIActionType.LightAttack:
+                case AIActionType.SpecialPhase:
+                case AIActionType.ParryCounter:
+                    StopHorizontalMovement();
+                    if (decision.ShouldFacePlayer) FaceTarget();
+                    actionRoutine = StartCoroutine(isKamikaze ? KamikazeRoutine() : MeleeAttackRoutine(false));
+                    break;
+
+                case AIActionType.MoveTowardPlayer:
+                case AIActionType.MoveAwayFromPlayer:
                 {
-                    if (isKamikaze)
-                    {
-                        actionRoutine = StartCoroutine(KamikazeRoutine());
-                    }
-                    else
-                    {
-                        actionRoutine = StartCoroutine(MeleeAttackRoutine());
-                    }
-                }
-                else
-                {
+                    float speed = enemyData != null ? enemyData.moveSpeed : 3.5f;
+                    MoveHorizontally(decision.MoveDirectionX, speed);
+                    if (decision.ShouldFacePlayer) FaceTarget();
                     SetAnimState(0);
+                    break;
                 }
-            }
-            else
-            {
-                float speed = enemyData != null ? enemyData.moveSpeed : 3.5f;
-                float dirX = Mathf.Sign(playerTarget.position.x - transform.position.x);
-                MoveHorizontally(dirX, speed);
-                SetAnimState(0);
+
+                default:
+                    StopHorizontalMovement();
+                    if (decision.ShouldFacePlayer) FaceTarget();
+                    SetAnimState(0);
+                    break;
             }
         }
 
-        private IEnumerator MeleeAttackRoutine()
+        private IEnumerator MeleeAttackRoutine(bool forceHeavy = false)
         {
             isActing = true;
             StopHorizontalMovement();
@@ -66,7 +94,7 @@ namespace StickmanBeatEmUp.Enemies
 
             if (IsDead || isFrozen) yield break;
 
-            int attackClip = (useAlternatingAttack2 && flipAttackToggle) ? 2 : 1;
+            int attackClip = (forceHeavy || (useAlternatingAttack2 && flipAttackToggle)) ? 2 : 1;
             flipAttackToggle = !flipAttackToggle;
             SetAnimState(attackClip);
 
