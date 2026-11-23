@@ -2,26 +2,30 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 using StickmanBeatEmUp.Core;
+using StickmanBeatEmUp.CorePure.Entities.DTOs;
+using StickmanBeatEmUp.CorePure.Rules.Economy;
 
 namespace StickmanBeatEmUp.Items
 {
     /// <summary>
-    /// Quản lý kho vật phẩm dùng chung (Shared Quantities) và 2 ô trang bị (Slot Q = 0, Slot E = 1).
-    /// Mọi thay đổi số lượng và trang bị được lưu tức thì qua PlayerPrefs và không bao giờ hoàn lại khi Retry/Exit.
+    /// Unity Adapter quản lý kho vật phẩm dùng chung (Shared Quantities) và 2 ô trang bị (Slot Q = 0, Slot E = 1).
+    /// Ủy quyền toàn bộ quy tắc miền (kẹp trần 99, kiểm tra slot, tiêu thụ) sang InventoryRuleEngine thuần C#.
     /// </summary>
     public class InventoryManager : MonoBehaviour
     {
         public const string OWNED_PREF_PREFIX = "MDS_ItemOwned_";
         public const string EQUIPPED_SLOT_PREFIX = "MDS_EquippedSlot_";
-        public const int SLOT_Q = 0;
-        public const int SLOT_E = 1;
-        public const int SLOT_COUNT = 2;
+        public const int SLOT_Q = InventoryRuleEngine.SLOT_Q;
+        public const int SLOT_E = InventoryRuleEngine.SLOT_E;
+        public const int SLOT_COUNT = InventoryRuleEngine.SLOT_COUNT;
+        public const int MAX_STACK_PER_ITEM = InventoryRuleEngine.MAX_STACK_PER_ITEM;
 
         private static readonly ConsumableItemType[] DefaultCatalogOrder =
         {
             ConsumableItemType.SenzuBean,
             ConsumableItemType.SpinalFluid,
-            ConsumableItemType.UltraDivineWater
+            ConsumableItemType.UltraDivineWater,
+            ConsumableItemType.RageElixir
         };
 
         private static InventoryManager instance;
@@ -30,10 +34,9 @@ namespace StickmanBeatEmUp.Items
         [Header("Catalog (Tự động nạp Resources/Items nếu để trống)")]
         [SerializeField] private ConsumableItemSO[] itemCatalog;
 
+        private readonly InventoryRuleEngine ruleEngine = new InventoryRuleEngine();
         private readonly Dictionary<ConsumableItemType, ConsumableItemSO> itemDataMap = new Dictionary<ConsumableItemType, ConsumableItemSO>();
-        private readonly Dictionary<ConsumableItemType, int> ownedCounts = new Dictionary<ConsumableItemType, int>();
-        private readonly ConsumableItemType[] equippedSlots = new ConsumableItemType[SLOT_COUNT];
-        private readonly List<ConsumableItemSO> orderedCatalog = new List<ConsumableItemSO>(3);
+        private readonly List<ConsumableItemSO> orderedCatalog = new List<ConsumableItemSO>(4);
 
         private bool isInitialized;
 
@@ -58,19 +61,18 @@ namespace StickmanBeatEmUp.Items
             }
         }
 
-        /// <summary>
-        /// Khi bật (Training Mode), dùng vật phẩm Q/E miễn phí và không trừ kho.
-        /// </summary>
+        public InventoryRuleEngine RuleEngine
+        {
+            get
+            {
+                EnsureInitialized();
+                return ruleEngine;
+            }
+        }
+
         public bool IsTrainingFreeUseMode { get; set; }
 
-        /// <summary>
-        /// Phát ra bất cứ khi nào số lượng trong kho hoặc trang bị ô Q/E thay đổi.
-        /// </summary>
         public event Action OnInventoryChanged;
-
-        /// <summary>
-        /// Phát ra khi người chơi tiêu thụ thành công một ô vật phẩm (slotIndex, itemType).
-        /// </summary>
         public event Action<int, ConsumableItemType> OnSlotConsumed;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
@@ -166,25 +168,21 @@ namespace StickmanBeatEmUp.Items
 
         private void LoadInventoryAndSlots()
         {
-            ownedCounts.Clear();
-
             for (int i = 0; i < DefaultCatalogOrder.Length; i++)
             {
                 ConsumableItemType type = DefaultCatalogOrder[i];
                 int savedCount = Mathf.Max(0, PlayerPrefs.GetInt(GetOwnedPrefKey(type), 0));
-                ownedCounts[type] = savedCount;
+                ruleEngine.SetOwnedCountExact((int)type, savedCount);
             }
 
             foreach (ConsumableItemType key in itemDataMap.Keys)
             {
-                if (!ownedCounts.ContainsKey(key))
-                {
-                    ownedCounts[key] = Mathf.Max(0, PlayerPrefs.GetInt(GetOwnedPrefKey(key), 0));
-                }
+                int savedCount = Mathf.Max(0, PlayerPrefs.GetInt(GetOwnedPrefKey(key), 0));
+                ruleEngine.SetOwnedCountExact((int)key, savedCount);
             }
 
-            equippedSlots[SLOT_Q] = LoadEquippedSlot(SLOT_Q, ConsumableItemType.SenzuBean);
-            equippedSlots[SLOT_E] = LoadEquippedSlot(SLOT_E, ConsumableItemType.SpinalFluid);
+            ruleEngine.TrySetEquippedItem(SLOT_Q, (int)LoadEquippedSlot(SLOT_Q, ConsumableItemType.SenzuBean));
+            ruleEngine.TrySetEquippedItem(SLOT_E, (int)LoadEquippedSlot(SLOT_E, ConsumableItemType.SpinalFluid));
         }
 
         private static ConsumableItemType LoadEquippedSlot(int slotIndex, ConsumableItemType defaultType)
@@ -197,109 +195,94 @@ namespace StickmanBeatEmUp.Items
             return (ConsumableItemType)raw;
         }
 
-        /// <summary>
-        /// Trả về tổng số lượng đang sở hữu của một loại vật phẩm (dùng chung cho cả Q và E).
-        /// </summary>
         public int GetOwnedCount(ConsumableItemType type)
         {
             EnsureInitialized();
             if (type == ConsumableItemType.None) return 0;
-            return ownedCounts.TryGetValue(type, out int count) ? count : 0;
+            return ruleEngine.GetOwnedCount((int)type);
         }
 
-        /// <summary>
-        /// Cộng thêm vật phẩm vào kho dùng chung, lưu ngay PlayerPrefs và thông báo UI.
-        /// </summary>
         public void AddOwnedItem(ConsumableItemType type, int amount = 1)
         {
             EnsureInitialized();
             if (type == ConsumableItemType.None || amount <= 0) return;
 
-            int updated = GetOwnedCount(type) + amount;
-            ownedCounts[type] = updated;
+            int added = ruleEngine.AddItem((int)type, amount);
+            if (added <= 0) return;
 
+            int updated = ruleEngine.GetOwnedCount((int)type);
             PlayerPrefs.SetInt(GetOwnedPrefKey(type), updated);
             PlayerPrefs.Save();
 
             OnInventoryChanged?.Invoke();
         }
 
-        /// <summary>
-        /// Lấy loại vật phẩm đang trang bị ở ô 0 (Q) hoặc 1 (E).
-        /// </summary>
+        public void SetOwnedCountExact(ConsumableItemType type, int count)
+        {
+            EnsureInitialized();
+            if (type == ConsumableItemType.None) return;
+
+            ruleEngine.SetOwnedCountExact((int)type, count);
+            PlayerPrefs.SetInt(GetOwnedPrefKey(type), ruleEngine.GetOwnedCount((int)type));
+            PlayerPrefs.Save();
+
+            OnInventoryChanged?.Invoke();
+        }
+
         public ConsumableItemType GetEquippedItem(int slotIndex)
         {
             EnsureInitialized();
-            if (slotIndex < 0 || slotIndex >= SLOT_COUNT) return ConsumableItemType.None;
-            return equippedSlots[slotIndex];
+            int raw = ruleEngine.GetEquippedItem(slotIndex);
+            return Enum.IsDefined(typeof(ConsumableItemType), raw)
+                ? (ConsumableItemType)raw
+                : ConsumableItemType.None;
         }
 
-        /// <summary>
-        /// Gán vật phẩm vào ô trang bị 0 (Q) hoặc 1 (E). Hỗ trợ gắn cùng 1 vật phẩm ở cả 2 ô.
-        /// </summary>
         public void SetEquippedItem(int slotIndex, ConsumableItemType type)
         {
             EnsureInitialized();
-            if (slotIndex < 0 || slotIndex >= SLOT_COUNT) return;
+            if (!InventoryRuleEngine.IsValidSlotIndex(slotIndex)) return;
 
             if (!Enum.IsDefined(typeof(ConsumableItemType), type))
             {
                 type = ConsumableItemType.None;
             }
 
-            equippedSlots[slotIndex] = type;
+            ruleEngine.TrySetEquippedItem(slotIndex, (int)type);
             PlayerPrefs.SetInt(GetSlotPrefKey(slotIndex), (int)type);
             PlayerPrefs.Save();
 
             OnInventoryChanged?.Invoke();
         }
 
-        /// <summary>
-        /// Kiểm tra ô trang bị có thể kích hoạt ở thời điểm hiện tại hay không.
-        /// </summary>
         public bool CanUseSlot(int slotIndex)
         {
-            ConsumableItemType item = GetEquippedItem(slotIndex);
-            if (item == ConsumableItemType.None) return false;
-            return IsTrainingFreeUseMode || GetOwnedCount(item) > 0;
+            EnsureInitialized();
+            return ruleEngine.CanUseSlot(slotIndex, IsTrainingFreeUseMode);
         }
 
-        /// <summary>
-        /// Lấy số lượng hiện có của vật phẩm đang gắn ở ô slotIndex.
-        /// </summary>
         public int GetSlotQuantity(int slotIndex)
         {
             return GetOwnedCount(GetEquippedItem(slotIndex));
         }
 
-        /// <summary>
-        /// Tiêu thụ vật phẩm tại ô Q (0) hoặc E (1).
-        /// Trong Campaign/Endless: trừ kho dùng chung và gọi PlayerPrefs.Save() ngay lập tức.
-        /// Trong Training (IsTrainingFreeUseMode = true): cho dùng miễn phí mà không trừ kho.
-        /// </summary>
         public bool TryConsumeSlot(int slotIndex, out ConsumableItemType usedType)
         {
             EnsureInitialized();
 
-            usedType = GetEquippedItem(slotIndex);
-            if (usedType == ConsumableItemType.None)
+            if (!ruleEngine.TryConsumeSlot(slotIndex, IsTrainingFreeUseMode, out int usedId) ||
+                !Enum.IsDefined(typeof(ConsumableItemType), usedId))
             {
+                usedType = ConsumableItemType.None;
                 return false;
             }
 
+            usedType = (ConsumableItemType)usedId;
             if (!IsTrainingFreeUseMode)
             {
-                int currentCount = GetOwnedCount(usedType);
-                if (currentCount <= 0)
-                {
-                    return false;
-                }
-
-                int remaining = currentCount - 1;
-                ownedCounts[usedType] = remaining;
+                int remaining = ruleEngine.GetOwnedCount(usedId);
                 PlayerPrefs.SetInt(GetOwnedPrefKey(usedType), remaining);
                 PlayerPrefs.Save();
-
                 OnInventoryChanged?.Invoke();
             }
 
@@ -307,57 +290,83 @@ namespace StickmanBeatEmUp.Items
             return true;
         }
 
-        /// <summary>
-        /// Lấy metadata ScriptableObject của vật phẩm.
-        /// </summary>
         public ConsumableItemSO GetItemData(ConsumableItemType type)
         {
             EnsureInitialized();
             if (type == ConsumableItemType.None) return null;
 
-            if (itemDataMap.TryGetValue(type, out ConsumableItemSO data))
-            {
-                return data;
-            }
-
-            return null;
+            return itemDataMap.TryGetValue(type, out ConsumableItemSO data) ? data : null;
         }
 
-        /// <summary>
-        /// Trả về toàn bộ danh sách vật phẩm theo thứ tự chuẩn của Shop.
-        /// </summary>
         public ConsumableItemSO[] GetAllItems()
         {
             EnsureInitialized();
             return orderedCatalog.ToArray();
         }
 
-        /// <summary>
-        /// Đặt lại toàn bộ kho về 0 và trang bị mặc định (Q = SenzuBean, E = SpinalFluid).
-        /// </summary>
-        public void ResetInventory()
+        public void ApplySnapshot(GameStateDTO state)
         {
             EnsureInitialized();
+            if (state == null) return;
+
+            ruleEngine.SetOwnedCountExact((int)ConsumableItemType.SenzuBean, state.senzuCount);
+            ruleEngine.SetOwnedCountExact((int)ConsumableItemType.SpinalFluid, state.spinalFluidCount);
+            ruleEngine.SetOwnedCountExact((int)ConsumableItemType.UltraDivineWater, state.ultraWaterCount);
+            ruleEngine.SetOwnedCountExact((int)ConsumableItemType.RageElixir, 0);
+
+            if (state.extraItemCounts != null)
+            {
+                for (int i = 0; i < state.extraItemCounts.Count; i++)
+                {
+                    ItemCountEntryDTO entry = state.extraItemCounts[i];
+                    if (entry != null && entry.itemTypeId > 0)
+                    {
+                        ruleEngine.SetOwnedCountExact(entry.itemTypeId, entry.count);
+                    }
+                }
+            }
+
+            ConsumableItemType slotQ = Enum.IsDefined(typeof(ConsumableItemType), state.equippedSlotQ)
+                ? (ConsumableItemType)state.equippedSlotQ
+                : ConsumableItemType.SenzuBean;
+            ConsumableItemType slotE = Enum.IsDefined(typeof(ConsumableItemType), state.equippedSlotE)
+                ? (ConsumableItemType)state.equippedSlotE
+                : ConsumableItemType.SpinalFluid;
+
+            ruleEngine.TrySetEquippedItem(SLOT_Q, (int)slotQ);
+            ruleEngine.TrySetEquippedItem(SLOT_E, (int)slotE);
 
             for (int i = 0; i < DefaultCatalogOrder.Length; i++)
             {
                 ConsumableItemType type = DefaultCatalogOrder[i];
-                ownedCounts[type] = 0;
-                PlayerPrefs.SetInt(GetOwnedPrefKey(type), 0);
+                PlayerPrefs.SetInt(GetOwnedPrefKey(type), ruleEngine.GetOwnedCount((int)type));
             }
-
-            equippedSlots[SLOT_Q] = ConsumableItemType.SenzuBean;
-            equippedSlots[SLOT_E] = ConsumableItemType.SpinalFluid;
-            PlayerPrefs.SetInt(GetSlotPrefKey(SLOT_Q), (int)equippedSlots[SLOT_Q]);
-            PlayerPrefs.SetInt(GetSlotPrefKey(SLOT_E), (int)equippedSlots[SLOT_E]);
+            PlayerPrefs.SetInt(GetSlotPrefKey(SLOT_Q), (int)slotQ);
+            PlayerPrefs.SetInt(GetSlotPrefKey(SLOT_E), (int)slotE);
             PlayerPrefs.Save();
 
             OnInventoryChanged?.Invoke();
         }
 
-        /// <summary>
-        /// Nạp lại kho vật phẩm và 2 ô trang bị Q/E từ PlayerPrefs và phát OnInventoryChanged.
-        /// </summary>
+        public void ResetInventory()
+        {
+            EnsureInitialized();
+
+            int[] knownIds = new int[DefaultCatalogOrder.Length];
+            for (int i = 0; i < DefaultCatalogOrder.Length; i++)
+            {
+                knownIds[i] = (int)DefaultCatalogOrder[i];
+                PlayerPrefs.SetInt(GetOwnedPrefKey(DefaultCatalogOrder[i]), 0);
+            }
+
+            ruleEngine.ResetToDefaults(knownIds);
+            PlayerPrefs.SetInt(GetSlotPrefKey(SLOT_Q), (int)ConsumableItemType.SenzuBean);
+            PlayerPrefs.SetInt(GetSlotPrefKey(SLOT_E), (int)ConsumableItemType.SpinalFluid);
+            PlayerPrefs.Save();
+
+            OnInventoryChanged?.Invoke();
+        }
+
         public void ReloadProfileState()
         {
             if (!isInitialized)

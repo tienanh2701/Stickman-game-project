@@ -2,6 +2,7 @@ using System;
 using UnityEngine;
 using UnityEngine.UI;
 using StickmanBeatEmUp.Core;
+using StickmanBeatEmUp.CorePure.Rules.Economy;
 using StickmanBeatEmUp.Items;
 using StickmanBeatEmUp.UI;
 
@@ -56,8 +57,11 @@ namespace StickmanBeatEmUp.Economy
         [SerializeField] private Sprite summaryBarSprite;
         [SerializeField] private Sprite iconSlotBlueGlowSprite;
 
+        private readonly ShopRuleEngine ruleEngine = new ShopRuleEngine();
         private float feedbackTimer;
         private bool rowsBound;
+
+        public ShopRuleEngine RuleEngine => ruleEngine;
 
         /// <summary>
         /// Thông báo kết quả giao dịch mua vật phẩm (itemType, success, feedbackMessage).
@@ -203,7 +207,8 @@ namespace StickmanBeatEmUp.Economy
         }
 
         /// <summary>
-        /// Thử mua 1 vật phẩm bằng Xu. Trả về true nếu thành công kèm thông báo tiếng Việt.
+        /// Thử mua 1 vật phẩm bằng Xu thông qua ShopRuleEngine (CorePure).
+        /// Giữ nguyên thông điệp "Không đủ Xu!" theo hợp đồng E2E (F05_T2, T5_B03).
         /// </summary>
         public bool TryPurchaseItem(ConsumableItemType type, out string feedbackMessage)
         {
@@ -227,10 +232,22 @@ namespace StickmanBeatEmUp.Economy
                 return false;
             }
 
+            int currentCoins = currency != null ? currency.CurrentCoins : 0;
+            int currentOwned = inventory.GetOwnedCount(type);
+            string displayName = string.IsNullOrEmpty(itemData.itemName) ? type.ToString() : itemData.itemName;
             int price = Mathf.Max(0, itemData.price);
-            if (currency == null || !currency.TrySpendCoins(price))
+
+            ShopPurchaseResult eval = ruleEngine.EvaluatePurchase(
+                (int)type,
+                displayName,
+                price,
+                currentCoins,
+                currentOwned,
+                InventoryManager.MAX_STACK_PER_ITEM);
+
+            if (!eval.Succeeded || currency == null || !currency.TrySpendCoins(price))
             {
-                feedbackMessage = "Không đủ Xu!";
+                feedbackMessage = eval.Succeeded ? "Không đủ Xu!" : eval.FeedbackMessage;
                 ShowFeedback(feedbackMessage, false);
                 OnPurchaseResult?.Invoke(type, false, feedbackMessage);
                 return false;
@@ -239,7 +256,6 @@ namespace StickmanBeatEmUp.Economy
             inventory.AddOwnedItem(type, 1);
             AutoEquipIfSlotAvailable(inventory, type);
             int newCount = inventory.GetOwnedCount(type);
-            string displayName = string.IsNullOrEmpty(itemData.itemName) ? type.ToString() : itemData.itemName;
             feedbackMessage = $"Đã mua {displayName}! (Sở hữu: {newCount})";
 
             ShowFeedback(feedbackMessage, true);
@@ -266,6 +282,11 @@ namespace StickmanBeatEmUp.Economy
         public void PurchaseUltraWater()
         {
             PurchaseItem(ConsumableItemType.UltraDivineWater);
+        }
+
+        public void PurchaseRageElixir()
+        {
+            PurchaseItem(ConsumableItemType.RageElixir);
         }
 
         /// <summary>
@@ -844,6 +865,7 @@ namespace StickmanBeatEmUp.Economy
                 ConsumableItemType.SenzuBean => UIManager.LoadItemIconSprite("Icon_SenzuBean.png"),
                 ConsumableItemType.SpinalFluid => UIManager.LoadItemIconSprite("Icon_SpinalFluid.png"),
                 ConsumableItemType.UltraDivineWater => UIManager.LoadItemIconSprite("Icon_UltraDivineWater.png"),
+                ConsumableItemType.RageElixir => UIManager.LoadItemIconSprite("Icon_UltraDivineWater.png"),
                 _ => null
             };
         }
