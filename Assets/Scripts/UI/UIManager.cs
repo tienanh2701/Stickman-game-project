@@ -78,7 +78,8 @@ namespace StickmanBeatEmUp.UI
         {
             ConsumableItemType.SenzuBean,
             ConsumableItemType.SpinalFluid,
-            ConsumableItemType.UltraDivineWater
+            ConsumableItemType.UltraDivineWater,
+            ConsumableItemType.RageElixir
         };
 
         private static readonly string[] DefaultCharacterNames =

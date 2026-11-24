@@ -29,14 +29,15 @@ namespace StickmanBeatEmUp.Core
     }
 
     /// <summary>
-    /// 3 vật phẩm tiêu hao bán trong Shop và dùng qua phím Q / E
+    /// 4 vật phẩm tiêu hao bán trong Shop và dùng qua phím Q / E
     /// </summary>
     public enum ConsumableItemType
     {
         None = 0,
         SenzuBean = 1,
         SpinalFluid = 2,
-        UltraDivineWater = 3
+        UltraDivineWater = 3,
+        RageElixir = 4
     }
 
     /// <summary>
