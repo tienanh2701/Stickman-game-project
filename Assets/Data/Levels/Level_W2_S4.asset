@@ -54,8 +54,8 @@ MonoBehaviour:
   bossSpawnPosition: {x: 9.5, y: -2.5}
   backgroundSprite: {fileID: 21300000, guid: 4d0322c137283d644a14d3e7eb7d97c2, type: 3}
   groundColor: {r: 0.315, g: 0.18, b: 0.16, a: 1}
-  enemyHpMultiplier: 1
-  enemyDamageMultiplier: 1
+  enemyHpMultiplier: 1.55
+  enemyDamageMultiplier: 1.35
   supportMeleeCreepPrefab: {fileID: 3386942052690689750, guid: 37f24fa90eac14445bdcbda7d2b08338, type: 3}
   supportRangedCreepPrefab: {fileID: 6429815808652313962, guid: efcc3d0b59775ac4aaf2686bec8aedf6, type: 3}
   supportElitePrefab: {fileID: 7873134680714801904, guid: 70602a9c13771f347924beb704771553, type: 3}
