@@ -1,8 +1,12 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.IO;
 using UnityEngine;
 using StickmanBeatEmUp.Core;
+using StickmanBeatEmUp.CorePure.Entities.DTOs;
+using StickmanBeatEmUp.CorePure.Exceptions;
+using StickmanBeatEmUp.CorePure.Rules.Combat;
 using StickmanBeatEmUp.Characters;
 using StickmanBeatEmUp.Economy;
 using StickmanBeatEmUp.Enemies;
@@ -46,6 +50,7 @@ namespace StickmanBeatEmUp.Level
         private List<BaseEnemy> activeEnemies = new List<BaseEnemy>();
         private GameMode currentGameMode = GameMode.Campaign;
         private bool isRespawningTrainingPlayer;
+        private GameBalanceConfigDTO runtimeBalanceConfig;
         private const string UNLOCKED_STAGE_KEY = "Stickman_UnlockedStage";
         private const string SELECTED_STAGE_INDEX_KEY = "SelectedStageIndex";
 
@@ -113,6 +118,71 @@ namespace StickmanBeatEmUp.Level
             }
 
             ApplyModeGlobalFlags();
+            LoadRuntimeBalanceConfigIfPresent();
+        }
+
+        private void LoadRuntimeBalanceConfigIfPresent()
+        {
+            runtimeBalanceConfig = null;
+            string configPath = Path.Combine(Application.streamingAssetsPath, "Config", "game_balance.json");
+            if (!File.Exists(configPath))
+            {
+                return;
+            }
+
+            try
+            {
+                string json = File.ReadAllText(configPath);
+                if (string.IsNullOrWhiteSpace(json))
+                {
+                    return;
+                }
+
+                GameBalanceConfigDTO parsed;
+                try
+                {
+                    parsed = JsonUtility.FromJson<GameBalanceConfigDTO>(json);
+                }
+                catch (ArgumentException ex)
+                {
+                    throw new InvalidGameConfigException("game_balance.json", $"Malformed JSON syntax: {ex.Message}", ex);
+                }
+
+                if (parsed != null)
+                {
+                    parsed.Validate();
+                    runtimeBalanceConfig = parsed;
+                }
+            }
+            catch (StickmanGameException ex)
+            {
+                Debug.LogWarning($"[LevelManager] External game_balance.json invalid ({ex.ErrorCode}): {ex.Message}");
+            }
+            catch (IOException ex)
+            {
+                Debug.LogWarning($"[LevelManager] Cannot read game_balance.json: {ex.Message}");
+            }
+        }
+
+        private void ResolveCurrentStageMultipliers(out float hpMultiplier, out float damageMultiplier)
+        {
+            hpMultiplier = 1f;
+            damageMultiplier = 1f;
+
+            if (currentStageData is LevelDataSO levelData)
+            {
+                hpMultiplier = levelData.enemyHpMultiplier > 0f ? levelData.enemyHpMultiplier : 1f;
+                damageMultiplier = levelData.enemyDamageMultiplier > 0f ? levelData.enemyDamageMultiplier : 1f;
+            }
+
+            if (runtimeBalanceConfig != null && currentStageData != null)
+            {
+                int worldIdx = ((int)currentStageData.worldType) + 1;
+                int stageIdx = Mathf.Clamp(currentStageData.stageNumber, 1, 4);
+                LevelBalanceDTO dto = WaveCompositionCalculator.ResolveCampaignLevelBalance(worldIdx, stageIdx, runtimeBalanceConfig);
+                hpMultiplier = dto.enemyHpMultiplier;
+                damageMultiplier = dto.enemyDamageMultiplier;
+            }
         }
 
         private void OnDestroy()
@@ -256,6 +326,7 @@ namespace StickmanBeatEmUp.Level
                 endlessModeManager.gameObject.SetActive(true);
             }
             endlessModeManager.enabled = true;
+            endlessModeManager.SetBalanceConfig(runtimeBalanceConfig);
             endlessModeManager.SetArenaBounds(arenaMinX, arenaMaxX);
             endlessModeManager.BeginEndless(this, activePlayer);
         }
@@ -505,6 +576,8 @@ namespace StickmanBeatEmUp.Level
                         EnemyBase newEnemy = enemyObj.GetComponent<EnemyBase>();
                         if (newEnemy != null)
                         {
+                            ResolveCurrentStageMultipliers(out float stageHpMult, out float stageDmgMult);
+                            newEnemy.ApplyCampaignScaling(stageHpMult, stageDmgMult);
                             if (entry.maxHealthOverride > 0f)
                             {
                                 newEnemy.SetMaxHealthOverride(entry.maxHealthOverride);
@@ -520,6 +593,8 @@ namespace StickmanBeatEmUp.Level
                         BossBase waveBoss = enemyObj.GetComponent<BossBase>();
                         if (waveBoss != null)
                         {
+                            ResolveCurrentStageMultipliers(out float waveBossHpMult, out float waveBossDmgMult);
+                            waveBoss.ApplyCampaignScaling(waveBossHpMult, waveBossDmgMult);
                             waveBoss.OnBossDefeated += HandleBossBaseDefeated;
                             continue;
                         }
@@ -567,6 +642,8 @@ namespace StickmanBeatEmUp.Level
                 BossBase newBoss = bossObj.GetComponent<BossBase>();
                 if (newBoss != null)
                 {
+                    ResolveCurrentStageMultipliers(out float bossHpMult, out float bossDmgMult);
+                    newBoss.ApplyCampaignScaling(bossHpMult, bossDmgMult);
                     remainingEnemiesInWave = 1;
                     OnEnemiesRemainingChanged?.Invoke(remainingEnemiesInWave);
                     newBoss.OnBossDefeated += HandleBossBaseDefeated;

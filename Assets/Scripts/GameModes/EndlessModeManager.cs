@@ -8,6 +8,7 @@ using StickmanBeatEmUp.Core;
 using StickmanBeatEmUp.CorePure.Entities.DTOs;
 using StickmanBeatEmUp.CorePure.Interfaces;
 using StickmanBeatEmUp.CorePure.Patterns.Factories;
+using StickmanBeatEmUp.CorePure.Rules.Combat;
 using StickmanBeatEmUp.Characters;
 using StickmanBeatEmUp.Enemies;
 using StickmanBeatEmUp.Enemies.Stats;
@@ -66,6 +67,7 @@ namespace StickmanBeatEmUp.GameModes
         private readonly List<GameObject> activeEnemies = new List<GameObject>();
         private readonly WorldEnemyFactory defaultEnemyFactory = new WorldEnemyFactory();
         private IEnemyFactory enemyFactory;
+        private GameBalanceConfigDTO cachedBalanceConfig;
 
         private GameObject restBannerObj;
         private TextMeshProUGUI restBannerText;
@@ -80,6 +82,15 @@ namespace StickmanBeatEmUp.GameModes
         public void SetEnemyFactory(IEnemyFactory factory)
         {
             enemyFactory = factory ?? defaultEnemyFactory;
+        }
+
+        public void SetBalanceConfig(GameBalanceConfigDTO config)
+        {
+            cachedBalanceConfig = config;
+            if (config != null && enemyFactory == null)
+            {
+                enemyFactory = new WorldEnemyFactory(config);
+            }
         }
 
         public void SetEnemyCatalog(EndlessEnemyCatalogSO catalog)
@@ -306,7 +317,7 @@ namespace StickmanBeatEmUp.GameModes
                 }
             }
 
-            bool isEnraged = isCreep && w >= 15 && UnityEngine.Random.value < 0.15f;
+            bool isEnraged = isCreep && WaveCompositionCalculator.CalculateEnemyScaling(w, cachedBalanceConfig).EnragedChance > 0f && UnityEngine.Random.value < WaveCompositionCalculator.CalculateEnemyScaling(w, cachedBalanceConfig).EnragedChance;
 
             enemy.ApplyEndlessModifiers(
                 hpMult,
@@ -405,7 +416,7 @@ namespace StickmanBeatEmUp.GameModes
             return 1;
         }
 
-        private static void ComputeWaveScaling(
+        private void ComputeWaveScaling(
             int wave,
             out float hpMult,
             out float dmgMult,
@@ -414,16 +425,16 @@ namespace StickmanBeatEmUp.GameModes
             out float damageReduction,
             out float attackSpeedMult)
         {
-            int w = Mathf.Max(1, wave);
-            hpMult = 1f + 0.03f * (w - 1);
-            dmgMult = Mathf.Min(1.75f, 1f + 0.015f * (w - 1));
-            moveSpeedMult = Mathf.Min(1.25f, 1f + 0.008f * (w - 1));
-            staggerMult = w >= 10 ? 0.80f : 1f;
-            damageReduction = w >= 20 ? Mathf.Min(0.25f, 0.10f + 0.05f * ((w - 20) / 5)) : 0f;
-            attackSpeedMult = w >= 20 ? 1.12f : 1f;
+            WaveScalingResult s = WaveCompositionCalculator.CalculateEnemyScaling(wave, cachedBalanceConfig);
+            hpMult = s.HealthMultiplier;
+            dmgMult = s.DamageMultiplier;
+            moveSpeedMult = s.MoveSpeedMultiplier;
+            staggerMult = s.StaggerMultiplier;
+            damageReduction = s.DamageReduction;
+            attackSpeedMult = s.AttackSpeedMultiplier;
         }
 
-        private static void ComputeBossWaveScaling(
+        private void ComputeBossWaveScaling(
             int wave,
             out float bossHpMult,
             out float bossDmgMult,
@@ -432,14 +443,13 @@ namespace StickmanBeatEmUp.GameModes
             out float bossDrPct,
             out float bossAtkSpd)
         {
-            int w = Mathf.Max(1, wave);
-            int bossTier = Mathf.Max(0, (w / 5) - 1);
-            bossHpMult = 1f + 0.10f * bossTier;
-            bossDmgMult = w <= 5 ? 1f : Mathf.Min(1.75f, 1f + 0.015f * (w - 5));
-            bossSpeedMult = w <= 5 ? 1f : Mathf.Min(1.25f, 1f + 0.008f * (w - 5));
-            bossStaggerMult = w >= 10 ? 0.80f : 1f;
-            bossDrPct = w >= 20 ? Mathf.Min(0.25f, 0.10f + 0.05f * ((w - 20) / 5)) : 0f;
-            bossAtkSpd = w >= 20 ? 1.10f : 1f;
+            WaveScalingResult s = WaveCompositionCalculator.CalculateBossScaling(wave, cachedBalanceConfig);
+            bossHpMult = s.HealthMultiplier;
+            bossDmgMult = s.DamageMultiplier;
+            bossSpeedMult = s.MoveSpeedMultiplier;
+            bossStaggerMult = s.StaggerMultiplier;
+            bossDrPct = s.DamageReduction;
+            bossAtkSpd = s.AttackSpeedMultiplier;
         }
 
         private BaseCharacter ResolvePlayer(BaseCharacter candidate)
@@ -477,18 +487,14 @@ namespace StickmanBeatEmUp.GameModes
 
         private void CalculateWaveComposition(int wave, out int creepCount, out int eliteCount, out int bossCount)
         {
-            int w = Mathf.Max(1, wave);
-            creepCount = 3 + Mathf.FloorToInt(w * 1.2f);
-            eliteCount = (w >= 3 && (w - 3) % 2 == 0)
-                ? 1 + Mathf.FloorToInt((w - 3) / 3f)
-                : 0;
-            bossCount = (w >= 5 && w % 5 == 0 && bosses.Count > 0) ? 1 : 0;
-
-            if (w % 5 == 0 || bossCount > 0)
-            {
-                creepCount = Mathf.Clamp(Mathf.Max(2, creepCount / 2), 2, 3);
-                eliteCount = 0;
-            }
+            WaveCompositionResult comp = WaveCompositionCalculator.CalculateComposition(
+                wave,
+                hasBossPool: bosses.Count > 0,
+                hasElitePool: true,
+                hasCreepPool: true);
+            creepCount = comp.CreepCount;
+            eliteCount = comp.EliteCount;
+            bossCount = comp.BossCount;
         }
 
         private IEnumerator RunEndlessWaveLoop(int startWave = 1)
