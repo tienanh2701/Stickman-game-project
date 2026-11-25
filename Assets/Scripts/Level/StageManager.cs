@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using StickmanBeatEmUp.Audio;
 using StickmanBeatEmUp.Core;
 
 namespace StickmanBeatEmUp.Level
@@ -87,6 +88,10 @@ namespace StickmanBeatEmUp.Level
                 // Endless & Training share World 1 Stage 1 (Attack on Titan) visuals without Campaign wave progression.
                 LevelDataSO aotLevel = GetDefaultAttackOnTitanLevel();
                 ApplyLevelVisuals(aotLevel);
+                if (Application.isPlaying && AudioManager.Instance != null)
+                {
+                    AudioManager.Instance.PlayWorldBgm(WorldType.World1_RuinedCity, isBossStage: false);
+                }
                 return;
             }
 
@@ -102,6 +107,10 @@ namespace StickmanBeatEmUp.Level
             }
 
             ApplyLevelVisuals(ActiveLevel);
+            if (Application.isPlaying && AudioManager.Instance != null)
+            {
+                AudioManager.Instance.PlayWorldBgm(ActiveLevel.worldType, ActiveLevel.isBossStage);
+            }
         }
 
         private LevelDataSO GetDefaultAttackOnTitanLevel()

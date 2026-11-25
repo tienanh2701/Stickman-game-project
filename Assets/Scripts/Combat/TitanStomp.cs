@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using StickmanBeatEmUp.Audio;
 using StickmanBeatEmUp.Core;
 using StickmanBeatEmUp.Level;
 
@@ -118,6 +119,10 @@ namespace StickmanBeatEmUp.Combat
             }
 
             CameraFollowBeatEmUp.Instance?.Shake(0.2f, 0.24f);
+            if (Application.isPlaying)
+            {
+                AudioManager.Instance?.PlaySfxByResourceName("Eren/eren_dashI_rumbling_stomp", 0.85f, 0.09f);
+            }
 
             // Quét toàn bộ kẻ thù trong phạm vi giẫm của bàn chân Titan
             Collider2D[] hits = Physics2D.OverlapBoxAll(landingPosition, stompAreaSize, 0f, targetLayer);

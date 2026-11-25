@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using StickmanBeatEmUp.Audio;
 using StickmanBeatEmUp.Characters;
 using StickmanBeatEmUp.Level;
 
@@ -55,6 +56,10 @@ namespace StickmanBeatEmUp.Core
         private readonly HashSet<IDamageable> hitTargets = new HashSet<IDamageable>();
         private static Sprite cachedShockwaveRingSprite;
 
+        private string impactSfxResourceName;
+        private float impactSfxVolumeScale = 1f;
+        private float impactSfxMinInterval = 0.05f;
+
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         private static void ResetStaticCache()
         {
@@ -107,6 +112,9 @@ namespace StickmanBeatEmUp.Core
             hasPreviousPosition = false;
             previousPosition = transform.position;
             hitTargets.Clear();
+            impactSfxResourceName = null;
+            impactSfxVolumeScale = 1f;
+            impactSfxMinInterval = 0.05f;
 
             if (projCollider == null) projCollider = GetComponent<Collider2D>();
             if (projCollider != null) projCollider.enabled = true;
@@ -130,7 +138,23 @@ namespace StickmanBeatEmUp.Core
             hasConsumed = true;
             hasPreviousPosition = false;
             hitTargets.Clear();
+            impactSfxResourceName = null;
+            impactSfxVolumeScale = 1f;
+            impactSfxMinInterval = 0.05f;
             if (projCollider != null) projCollider.enabled = false;
+        }
+
+        public void SetImpactSfx(string resourceSubPath, float volumeScale = 1f, float minInterval = 0.05f)
+        {
+            impactSfxResourceName = resourceSubPath;
+            impactSfxVolumeScale = volumeScale;
+            impactSfxMinInterval = minInterval;
+        }
+
+        private void PlayImpactSfx()
+        {
+            if (!Application.isPlaying || string.IsNullOrEmpty(impactSfxResourceName)) return;
+            AudioManager.Instance?.PlaySfxByResourceName(impactSfxResourceName, impactSfxVolumeScale, impactSfxMinInterval);
         }
 
         public void SetSpeed(float newSpeed)
@@ -360,6 +384,10 @@ namespace StickmanBeatEmUp.Core
             BaseCharacter.NotifyAttackerHit(damageData.attacker, damageData.attackType, target);
 
             SpawnImpactVfx();
+            if (!isTitanBoulder)
+            {
+                PlayImpactSfx();
+            }
 
             if (!isPiercing)
             {
@@ -463,6 +491,7 @@ namespace StickmanBeatEmUp.Core
             if (rb != null) rb.linearVelocity = Vector2.zero;
 
             SpawnBoulderExplosionVisual();
+            PlayImpactSfx();
             CameraFollowBeatEmUp.Instance?.Shake(0.24f, 0.22f);
 
             Collider2D[] hits = Physics2D.OverlapCircleAll(transform.position, boulderExplosionRadius, targetLayer);

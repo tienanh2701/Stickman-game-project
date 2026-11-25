@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
+using StickmanBeatEmUp.Audio;
 using StickmanBeatEmUp.Core;
 using StickmanBeatEmUp.CorePure.Entities.DTOs;
 using StickmanBeatEmUp.CorePure.Interfaces;
@@ -405,6 +406,26 @@ namespace StickmanBeatEmUp.GameModes
             return 1;
         }
 
+        private static WorldType ResolveBossWorldType(GameObject bossPrefab)
+        {
+            if (bossPrefab != null)
+            {
+                string n = bossPrefab.name;
+                if (n.IndexOf("Broly", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    n.IndexOf("W2", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    return WorldType.World2_Wasteland;
+                }
+                if (n.IndexOf("Mecha", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    n.IndexOf("Shadow", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    n.IndexOf("W3", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    return WorldType.World3_NeoCity;
+                }
+            }
+            return WorldType.World1_RuinedCity;
+        }
+
         private static void ComputeWaveScaling(
             int wave,
             out float hpMult,
@@ -574,12 +595,20 @@ namespace StickmanBeatEmUp.GameModes
                     if (bossPrefab != null)
                     {
                         SpawnEndlessEnemy(bossPrefab, wave, true);
+                        if (Application.isPlaying && AudioManager.Instance != null)
+                        {
+                            AudioManager.Instance.PlayWorldBgm(ResolveBossWorldType(bossPrefab), true);
+                        }
                     }
                     else
                     {
                         pendingSpawnCount = Mathf.Max(0, pendingSpawnCount - 1);
                         UpdateRemainingHudCount();
                     }
+                }
+                else if (Application.isPlaying && AudioManager.Instance != null)
+                {
+                    AudioManager.Instance.PlayWorldBgm(WorldType.World1_RuinedCity, false);
                 }
 
                 pendingSpawnCount = 0;

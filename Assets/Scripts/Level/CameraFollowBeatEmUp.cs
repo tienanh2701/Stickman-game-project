@@ -1,4 +1,5 @@
 using UnityEngine;
+using StickmanBeatEmUp.Core;
 
 namespace StickmanBeatEmUp.Level
 {
@@ -48,6 +49,13 @@ namespace StickmanBeatEmUp.Level
 
         public void Shake(float duration, float magnitude)
         {
+            if (GameSettingsManager.HasInstance)
+            {
+                float scale = GameSettingsManager.Instance.EffectiveScreenShakeScale;
+                if (scale <= 0.001f) return;
+                magnitude *= scale;
+            }
+
             shakeTimer = Mathf.Max(shakeTimer, duration);
             shakeMagnitude = Mathf.Max(shakeMagnitude, magnitude);
         }

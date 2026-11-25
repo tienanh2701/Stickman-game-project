@@ -88,6 +88,7 @@ namespace StickmanBeatEmUp.UI
             bool isCriticalOrHeavy = false)
         {
             if (!Application.isPlaying || isQuitting || amount <= 0f) return;
+            if (GameSettingsManager.HasInstance && !GameSettingsManager.Instance.ShowDamagePopups) return;
 
             DamagePopupManager mgr = EnsureInstance();
             if (mgr == null) return;
@@ -118,6 +119,7 @@ namespace StickmanBeatEmUp.UI
         public static void SpawnBlocked(Vector3 worldPos, float chipDamage = 0f)
         {
             if (!Application.isPlaying || isQuitting) return;
+            if (GameSettingsManager.HasInstance && !GameSettingsManager.Instance.ShowDamagePopups) return;
 
             DamagePopupManager mgr = EnsureInstance();
             if (mgr == null) return;
@@ -132,6 +134,7 @@ namespace StickmanBeatEmUp.UI
         public static void SpawnPlayerHit(Vector3 worldPos, float amount)
         {
             if (!Application.isPlaying || isQuitting || amount <= 0f) return;
+            if (GameSettingsManager.HasInstance && !GameSettingsManager.Instance.ShowDamagePopups) return;
 
             DamagePopupManager mgr = EnsureInstance();
             if (mgr == null) return;

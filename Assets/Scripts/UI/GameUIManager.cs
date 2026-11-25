@@ -97,6 +97,9 @@ namespace StickmanBeatEmUp.UI
         private EnemyBase activeElite;
         private GameMode currentGameMode = GameMode.Campaign;
         private int latestEndlessWave = 1;
+        private GameObject controlsHintContainer;
+        private TMP_Text controlsHintText;
+        private bool isSettingsSubscribed;
 
         public bool IsEndScreenOpen =>
             (victoryPanel != null && victoryPanel.activeSelf) ||
@@ -771,12 +774,25 @@ namespace StickmanBeatEmUp.UI
             GlassHudTheme.StyleTmpText(tgLbl, 18f, new Color(1f, 0.847f, 0.302f, 1f), true, true);
 
             GameObject hintGo = hintTr.gameObject;
+            controlsHintContainer = hintGo;
+            controlsHintText = hintTmp;
+            if (Application.isPlaying)
+            {
+                SubscribeSettingsEvents();
+                RefreshControlsHintFromSettings();
+            }
+
             tgBtn.onClick.RemoveAllListeners();
             tgBtn.onClick.AddListener(() =>
             {
                 if (hintGo != null)
                 {
-                    hintGo.SetActive(!hintGo.activeSelf);
+                    bool nextVisible = !hintGo.activeSelf;
+                    hintGo.SetActive(nextVisible);
+                    if (Application.isPlaying && GameSettingsManager.Instance != null)
+                    {
+                        GameSettingsManager.Instance.SetShowControlsHint(nextVisible);
+                    }
                 }
             });
         }
@@ -825,6 +841,7 @@ namespace StickmanBeatEmUp.UI
 
         private void OnDestroy()
         {
+            UnsubscribeSettingsEvents();
             UnbindCurrentPlayer();
 
             if (LevelManager.Instance != null)
@@ -853,6 +870,51 @@ namespace StickmanBeatEmUp.UI
                 }
                 runtimeTmpFont = null;
                 ownsRuntimeTmpFont = false;
+            }
+        }
+
+        private void SubscribeSettingsEvents()
+        {
+            if (isSettingsSubscribed || !Application.isPlaying) return;
+
+            GameSettingsManager settings = GameSettingsManager.Instance;
+            if (settings == null) return;
+
+            settings.OnKeyBindingsChanged -= RefreshControlsHintFromSettings;
+            settings.OnKeyBindingsChanged += RefreshControlsHintFromSettings;
+            settings.OnHudSettingsChanged -= RefreshControlsHintFromSettings;
+            settings.OnHudSettingsChanged += RefreshControlsHintFromSettings;
+            isSettingsSubscribed = true;
+        }
+
+        private void UnsubscribeSettingsEvents()
+        {
+            if (!isSettingsSubscribed) return;
+
+            if (GameSettingsManager.HasInstance)
+            {
+                GameSettingsManager.Instance.OnKeyBindingsChanged -= RefreshControlsHintFromSettings;
+                GameSettingsManager.Instance.OnHudSettingsChanged -= RefreshControlsHintFromSettings;
+            }
+            isSettingsSubscribed = false;
+        }
+
+        private void RefreshControlsHintFromSettings()
+        {
+            if (!Application.isPlaying) return;
+
+            GameSettingsManager settings = GameSettingsManager.HasInstance
+                ? GameSettingsManager.Instance
+                : GameSettingsManager.Instance;
+            if (settings == null) return;
+
+            if (controlsHintText != null)
+            {
+                controlsHintText.text = settings.BuildControlsHintRichText();
+            }
+            if (controlsHintContainer != null)
+            {
+                controlsHintContainer.SetActive(settings.ShowControlsHint);
             }
         }
 

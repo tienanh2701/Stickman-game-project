@@ -31,11 +31,13 @@ namespace StickmanBeatEmUp.UI
         [SerializeField] private Button resumeButton;
         [SerializeField] private Button retryButton;
         [SerializeField] private Button exitMenuButton;
+        [SerializeField] private Button pauseSettingsButton;
 
         [Header("Scene Navigation")]
         [SerializeField] private string mainMenuSceneName = "MainMenu";
 
         private InputHandler boundInputHandler;
+        private SettingsModalUI settingsModalUI;
         private bool isPaused;
         private bool isLevelSubscribed;
         private int lastToggleFrame = -1;
@@ -119,6 +121,11 @@ namespace StickmanBeatEmUp.UI
                     ApplyGlassModalTheme();
                 }
 
+                if (Application.isPlaying)
+                {
+                    EnsureRuntimeSettingsButton();
+                }
+
                 if (!wasPaused || !wasPanelActive)
                 {
                     PlayPauseBoxPopIn();
@@ -126,6 +133,10 @@ namespace StickmanBeatEmUp.UI
             }
             else
             {
+                if (settingsModalUI != null && settingsModalUI.IsOpen)
+                {
+                    settingsModalUI.Close();
+                }
                 StopPauseBoxPopInAndReset();
             }
         }
@@ -222,6 +233,11 @@ namespace StickmanBeatEmUp.UI
             ApplyGlassModalTheme();
             SubscribeLevelEvents();
             TryBindActiveInputHandler();
+            if (Application.isPlaying)
+            {
+                _ = GameSettingsManager.Instance;
+                EnsureRuntimeSettingsButton();
+            }
 
             if (pauseModalPanel != null)
             {
@@ -233,6 +249,11 @@ namespace StickmanBeatEmUp.UI
 
         private void Update()
         {
+            if (GameSettingsManager.IsCapturingKeyRebind || SettingsModalUI.LastConsumedEscapeFrame == Time.frameCount)
+            {
+                return;
+            }
+
             if (boundInputHandler == null)
             {
                 if (Time.unscaledTime >= nextInputLookupTime)
@@ -250,6 +271,12 @@ namespace StickmanBeatEmUp.UI
 
         private void OnDisable()
         {
+            if (settingsModalUI != null && settingsModalUI.IsOpen)
+            {
+                settingsModalUI.Close();
+            }
+            GameSettingsManager.IsCapturingKeyRebind = false;
+
             StopPauseBoxPopInAndReset();
             if (isPaused)
             {
@@ -266,6 +293,12 @@ namespace StickmanBeatEmUp.UI
 
         private void OnDestroy()
         {
+            if (settingsModalUI != null && settingsModalUI.IsOpen)
+            {
+                settingsModalUI.Close();
+            }
+            GameSettingsManager.IsCapturingKeyRebind = false;
+
             StopPauseBoxPopInAndReset();
             Time.timeScale = 1f;
             isPaused = false;
@@ -568,6 +601,95 @@ namespace StickmanBeatEmUp.UI
                 exitMenuButton.onClick.RemoveAllListeners();
                 exitMenuButton.onClick.AddListener(HandleExitToMenuClicked);
             }
+
+            if (pauseSettingsButton != null)
+            {
+                pauseSettingsButton.onClick.RemoveAllListeners();
+                pauseSettingsButton.onClick.AddListener(OpenSettingsModal);
+            }
+        }
+
+        private void EnsureRuntimeSettingsButton()
+        {
+            if (!Application.isPlaying || pauseModalPanel == null) return;
+            Transform boxTr = ResolvePauseBoxTransform();
+            if (boxTr == null) return;
+
+            if (pauseSettingsButton == null)
+            {
+                Transform existing = boxTr.Find("PauseSettingsButton");
+                if (existing != null)
+                {
+                    pauseSettingsButton = existing.GetComponent<Button>();
+                }
+                else
+                {
+                    GameObject btnObj = new GameObject("PauseSettingsButton", typeof(RectTransform), typeof(Image), typeof(Button));
+                    btnObj.transform.SetParent(boxTr, false);
+
+                    GameObject lblObj = new GameObject("Label", typeof(RectTransform), typeof(TextMeshProUGUI));
+                    lblObj.transform.SetParent(btnObj.transform, false);
+
+                    pauseSettingsButton = btnObj.GetComponent<Button>();
+                }
+            }
+
+            if (pauseSettingsButton != null)
+            {
+                RemoveFlatOutlines(pauseSettingsButton.gameObject);
+
+                RectTransform rt = pauseSettingsButton.GetComponent<RectTransform>();
+                if (rt != null)
+                {
+                    rt.anchorMin = new Vector2(0.5f, 0.5f);
+                    rt.anchorMax = new Vector2(0.5f, 0.5f);
+                    rt.pivot = new Vector2(0.5f, 0.5f);
+                    rt.anchoredPosition = new Vector2(0f, -188f);
+                    rt.sizeDelta = new Vector2(360f, 40f);
+                }
+
+                Image img = pauseSettingsButton.GetComponent<Image>();
+                if (img != null)
+                {
+                    Sprite btnSp = GlassHudTheme.LoadSprite("PillBtn_GlassNeutral.png");
+                    if (btnSp != null)
+                    {
+                        GlassHudTheme.ApplySlicedSprite(img, btnSp, 360f, 40f, Color.white);
+                    }
+                    else
+                    {
+                        img.color = new Color(0.16f, 0.26f, 0.42f, 0.96f);
+                    }
+                    img.raycastTarget = true;
+                    pauseSettingsButton.targetGraphic = img;
+                }
+
+                TMP_Text label = pauseSettingsButton.GetComponentInChildren<TMP_Text>(true);
+                if (label != null)
+                {
+                    label.text = "CÀI ĐẶT";
+                    label.alignment = TextAlignmentOptions.Center;
+                    label.raycastTarget = false;
+                    RectTransform labelRt = label.GetComponent<RectTransform>();
+                    if (labelRt != null)
+                    {
+                        labelRt.anchorMin = Vector2.zero;
+                        labelRt.anchorMax = Vector2.one;
+                        labelRt.offsetMin = new Vector2(14f, 0f);
+                        labelRt.offsetMax = new Vector2(-14f, 0f);
+                    }
+                    GlassHudTheme.StyleTmpText(label, 19f, Color.white, true, true);
+                }
+
+                pauseSettingsButton.onClick.RemoveAllListeners();
+                pauseSettingsButton.onClick.AddListener(OpenSettingsModal);
+            }
+        }
+
+        private void OpenSettingsModal()
+        {
+            if (!Application.isPlaying) return;
+            settingsModalUI = SettingsModalUI.OpenForCanvas(transform);
         }
 
         private void SubscribeLevelEvents()
@@ -627,6 +749,15 @@ namespace StickmanBeatEmUp.UI
 
         private void HandlePauseTriggered()
         {
+            if (GameSettingsManager.IsCapturingKeyRebind || SettingsModalUI.LastConsumedEscapeFrame == Time.frameCount)
+            {
+                return;
+            }
+            if (isPaused && settingsModalUI != null && settingsModalUI.IsOpen)
+            {
+                settingsModalUI.Close();
+                return;
+            }
             if (lastToggleFrame == Time.frameCount) return;
             lastToggleFrame = Time.frameCount;
             TogglePause();

@@ -2,6 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using StickmanBeatEmUp.Core;
+using StickmanBeatEmUp.CorePure.Entities.Combat;
 using StickmanBeatEmUp.Combat;
 
 namespace StickmanBeatEmUp.Characters
@@ -40,6 +41,11 @@ namespace StickmanBeatEmUp.Characters
             base.Awake();
             kivaLifetime = 15.0f;
         }
+
+        protected override void PlayJumpSfx() => PlayCharacterSfx("Diend/diend_state_jump", 0.85f, 0.08f);
+        protected override void PlayDashSfx() => PlayCharacterSfx("Diend/diend_state_dash", 0.90f, 0.08f);
+        protected override void PlayHurtSfx(DamageData damageData, CombatDamageResult result) => PlayCharacterSfx("Diend/diend_state_hurt", 0.92f, 0.14f);
+        protected override void PlayDieSfx() => PlayCharacterSfx("Diend/diend_state_die", 1.0f);
 
         private void OnDisable()
         {
@@ -108,6 +114,7 @@ namespace StickmanBeatEmUp.Characters
             rb.linearVelocity = Vector2.zero;
 
             Vector3 spawnPos = projectileSpawnPoint != null ? projectileSpawnPoint.position : transform.position + new Vector3(facingDirection * 0.9f, 0.85f, 0f);
+            PlayCharacterSfx("Diend/diend_J_normal_gun_shot", 0.90f, 0.04f);
 
             if (bulletPrefab != null)
             {
@@ -123,6 +130,7 @@ namespace StickmanBeatEmUp.Characters
                         false,
                         gameObject
                     );
+                    proj.SetImpactSfx("Diend/diend_J_bullet_hit", 0.85f, 0.06f);
                     proj.Initialize(dData, new Vector2(facingDirection, 0f), enemyLayerMask, false);
                 }
             }
@@ -146,6 +154,7 @@ namespace StickmanBeatEmUp.Characters
         private IEnumerator PhantomSlashRoutine()
         {
             SetActionAnimation(CharacterState.Skill, 1);
+            PlayCharacterSfx("Diend/diend_U_phantom_slash", 0.95f);
             rb.linearVelocity = Vector2.zero;
 
             Vector3 phantomSpawnPos = transform.position + new Vector3(facingDirection * 2.5f, 0.85f, 0f);
@@ -224,6 +233,7 @@ namespace StickmanBeatEmUp.Characters
         private IEnumerator PiercingCardShotRoutine()
         {
             SetActionAnimation(CharacterState.Skill, 2);
+            PlayCharacterSfx("Diend/diend_I_piercing_shot", 1.0f);
             rb.linearVelocity = Vector2.zero;
 
             if (isTransformed)
@@ -287,6 +297,7 @@ namespace StickmanBeatEmUp.Characters
         private IEnumerator FanSpreadShotRoutine()
         {
             SetActionAnimation(CharacterState.Attack, 1);
+            PlayCharacterSfx("Diend/diend_dashJ_fan_spread_shot", 1.0f);
 
             Vector3 spawnPos = projectileSpawnPoint != null ? projectileSpawnPoint.position : transform.position + new Vector3(facingDirection * 0.9f, 0.85f, 0f);
 
@@ -315,6 +326,7 @@ namespace StickmanBeatEmUp.Characters
                             true,
                             gameObject
                         );
+                        proj.SetImpactSfx("Diend/diend_J_bullet_hit", 0.85f, 0.06f);
                         proj.Initialize(dData, dir, enemyLayerMask, false);
                     }
                 }
@@ -339,6 +351,7 @@ namespace StickmanBeatEmUp.Characters
         private IEnumerator SummonLordKivaRoutine()
         {
             ChangeState(CharacterState.Transform);
+            PlayCharacterSfx("Diend/diend_O_transform_summon_kiva", 1.0f);
             rb.linearVelocity = Vector2.zero;
             isInvulnerable = true;
 
@@ -395,6 +408,7 @@ namespace StickmanBeatEmUp.Characters
         private IEnumerator SpecialCommandRoutine()
         {
             SetActionAnimation(CharacterState.Skill, 3);
+            PlayCharacterSfx("Diend/diend_dashI_dark_kiva_freeze", 1.0f);
             if (rb != null) rb.linearVelocity = Vector2.zero;
 
             float specialDamage = GetModifiedDamage(stats.specialComboDamage);

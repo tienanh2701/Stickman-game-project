@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.IO;
 using UnityEngine;
+using StickmanBeatEmUp.Audio;
 using StickmanBeatEmUp.Core;
 using StickmanBeatEmUp.CorePure.Entities.Combat;
 using StickmanBeatEmUp.CorePure.Interfaces;
@@ -978,6 +979,7 @@ namespace StickmanBeatEmUp.Characters
             {
                 float jump = stats != null ? stats.jumpForce : 12.0f;
                 rb.linearVelocity = new Vector2(rb.linearVelocity.x, jump);
+                PlayJumpSfx();
             }
         }
 
@@ -1006,6 +1008,7 @@ namespace StickmanBeatEmUp.Characters
         protected virtual IEnumerator DashRoutine(int direction)
         {
             ChangeState(CharacterState.Dash);
+            PlayDashSfx();
 
             float duration = stats != null ? stats.dashDuration : 0.25f;
             float speed = stats != null ? stats.dashSpeed : 15f;
@@ -1185,6 +1188,18 @@ namespace StickmanBeatEmUp.Characters
         /// Combo Đặc Biệt (Dash + I) - Sau biến hình & 30 nộ
         /// </summary>
         public abstract void ExecuteSpecialCombo();
+
+        protected static void PlayCharacterSfx(string resourceSubPath, float volumeScale = 1f, float minInterval = 0f)
+        {
+            if (!Application.isPlaying || string.IsNullOrEmpty(resourceSubPath)) return;
+            AudioManager.Instance?.PlaySfxByResourceName(resourceSubPath, volumeScale, minInterval);
+        }
+
+        protected virtual void PlayJumpSfx() { }
+        protected virtual void PlayDashSfx() { }
+        protected virtual void PlayHurtSfx(DamageData damageData, CombatDamageResult result) { }
+        protected virtual void PlayDieSfx() { }
+        protected virtual void PlayAttackHitSfx(AttackType attackType, IDamageable target) { }
         #endregion
 
         #region Combat Hit Notification
@@ -1193,6 +1208,7 @@ namespace StickmanBeatEmUp.Characters
         /// </summary>
         public virtual void OnHitEnemy(AttackType attackType, IDamageable target = null)
         {
+            PlayAttackHitSfx(attackType, target);
             rageManager?.AddRageFromHit(attackType, HitRageAmount);
             OnEnemyHit?.Invoke(attackType, target);
         }
@@ -1350,6 +1366,11 @@ namespace StickmanBeatEmUp.Characters
                 DamagePopupManager.SpawnPlayerHit(popupPos, result.FinalHealthDamage);
             }
 
+            if (!result.IsFatal && !blocking && (result.FinalHealthDamage > 0f || result.ShouldTriggerHitStun))
+            {
+                PlayHurtSfx(damageData, result);
+            }
+
             if (result.IsFatal)
             {
                 if (IsInTrainingMode())
@@ -1505,6 +1526,7 @@ namespace StickmanBeatEmUp.Characters
             OnShieldChanged?.Invoke(0f, maxVirtualShieldHp);
 
             ChangeState(CharacterState.Dead);
+            PlayDieSfx();
             rb.linearVelocity = Vector2.zero;
             if (spriteRenderer != null)
             {

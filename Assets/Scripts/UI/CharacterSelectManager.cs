@@ -74,6 +74,11 @@ namespace StickmanBeatEmUp.UI
 
         private void Start()
         {
+            if (Application.isPlaying)
+            {
+                StickmanBeatEmUp.Audio.AudioManager.Instance?.PlayMenuBgm();
+            }
+
             selectedCharacter = Mathf.Clamp(PlayerPrefs.GetInt(SELECTED_CHAR_KEY, 0), 0, 2);
             showTransformedPortrait = false;
             PlayerPrefs.SetInt(SELECTED_CHAR_KEY, selectedCharacter);

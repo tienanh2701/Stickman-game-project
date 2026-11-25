@@ -1,7 +1,9 @@
+using System;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
+using StickmanBeatEmUp.Audio;
 
 namespace StickmanBeatEmUp.UI
 {
@@ -20,6 +22,47 @@ namespace StickmanBeatEmUp.UI
         [SerializeField] private float pressScale = 0.97f;
         [SerializeField] private float transitionDuration = 0.08f;
         [SerializeField] private float hoverBrightnessBoost = 0.16f;
+        [SerializeField] private bool playUiSfx = true;
+
+        public static UiSfxType ResolveButtonSfxType(GameObject buttonObj)
+        {
+            if (buttonObj == null) return UiSfxType.Click;
+            string n = buttonObj.name;
+            if (string.IsNullOrEmpty(n)) return UiSfxType.Click;
+
+            if (n.IndexOf("Back", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                n.IndexOf("Close", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                n.IndexOf("Cancel", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                n.IndexOf("Exit", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                n.IndexOf("Quit", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                n.IndexOf("Logout", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                n.IndexOf("Reset", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                return UiSfxType.Back;
+            }
+
+            if (n.IndexOf("Play", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                n.IndexOf("Confirm", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                n.IndexOf("Continue", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                n.IndexOf("Next", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                n.IndexOf("Buy", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                n.IndexOf("Purchase", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                n.IndexOf("Resume", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                n.IndexOf("Start", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                n.IndexOf("Stage", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                n.IndexOf("Submit", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                n.IndexOf("Register", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                n.IndexOf("Login", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                n.IndexOf("Campaign", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                n.IndexOf("Endless", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                n.IndexOf("Training", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                n.IndexOf("Shop", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                return UiSfxType.Confirm;
+            }
+
+            return UiSfxType.Click;
+        }
 
         private static UIButtonJuiceBootstrapper bootstrapperInstance;
         private static bool isQuitting;
@@ -138,6 +181,10 @@ namespace StickmanBeatEmUp.UI
         public void OnPointerEnter(PointerEventData eventData)
         {
             if (!IsInteractable()) return;
+            if (playUiSfx && !isHovered && Application.isPlaying && !isQuitting && gameObject.scene.isLoaded)
+            {
+                AudioManager.Instance?.PlayUiSfx(UiSfxType.Hover, 0.55f);
+            }
             isHovered = true;
         }
 
@@ -150,6 +197,11 @@ namespace StickmanBeatEmUp.UI
         public void OnPointerDown(PointerEventData eventData)
         {
             if (!IsInteractable()) return;
+            if (playUiSfx && Application.isPlaying && !isQuitting && gameObject.scene.isLoaded &&
+                !string.Equals(gameObject.name, "TestSfxButton", StringComparison.OrdinalIgnoreCase))
+            {
+                AudioManager.Instance?.PlayUiSfx(ResolveButtonSfxType(gameObject), 0.85f);
+            }
             isPressed = true;
         }
 

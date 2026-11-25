@@ -2,6 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
+using StickmanBeatEmUp.Audio;
 using StickmanBeatEmUp.Characters;
 using StickmanBeatEmUp.Core;
 using StickmanBeatEmUp.Enemies;
@@ -454,6 +455,10 @@ namespace StickmanBeatEmUp.Combat
             explosionCenter.z = 0f;
 
             SpawnFullScreenFlash();
+            if (Application.isPlaying)
+            {
+                AudioManager.Instance?.PlaySfxByResourceName("Goku/goku_dashI_genkidama_explode", 1.0f);
+            }
             CameraFollowBeatEmUp.Instance?.Shake(0.65f, 0.48f);
             SpawnShockwaveBurst(explosionCenter);
             ApplyMapWideDamage(explosionCenter);

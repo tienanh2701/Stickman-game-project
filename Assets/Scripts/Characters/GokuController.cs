@@ -2,6 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using StickmanBeatEmUp.Core;
+using StickmanBeatEmUp.CorePure.Entities.Combat;
 using StickmanBeatEmUp.Combat;
 using StickmanBeatEmUp.Enemies;
 using StickmanBeatEmUp.Level;
@@ -143,6 +144,26 @@ namespace StickmanBeatEmUp.Characters
             return base.GetCustomSpeedMultiplier() * (isKaiokenActive ? kaiokenSpeedBonus : 1f);
         }
 
+        protected override void PlayJumpSfx() => PlayCharacterSfx("Goku/goku_state_jump", 0.85f, 0.08f);
+        protected override void PlayDashSfx() => PlayCharacterSfx("Goku/goku_state_dash", 0.90f, 0.08f);
+        protected override void PlayDieSfx() => PlayCharacterSfx("Goku/goku_state_die", 1.0f);
+
+        protected override void PlayHurtSfx(DamageData damageData, CombatDamageResult result)
+        {
+            bool isHeavy = damageData.attackType == AttackType.EnemyHeavyAttack
+                || result.FinalHealthDamage >= 18f
+                || damageData.knockbackForce.magnitude >= 7f;
+            PlayCharacterSfx(isHeavy ? "Goku/goku_state_hurt_heavy" : "Goku/goku_state_hurt", isHeavy ? 1.0f : 0.90f, 0.14f);
+        }
+
+        protected override void PlayAttackHitSfx(AttackType attackType, IDamageable target)
+        {
+            if (attackType == AttackType.NormalAttack_J)
+            {
+                PlayCharacterSfx(isTransformed ? "Goku/goku_J_ssj_attack_hit" : "Goku/goku_J_normal_attack_hit", 0.95f, 0.05f);
+            }
+        }
+
         #region Normal Attacks & Skills
         /// <summary>
         /// Đánh thường (Phím J): Chuỗi đấm cận chiến
@@ -155,6 +176,7 @@ namespace StickmanBeatEmUp.Characters
         private IEnumerator PunchRoutine()
         {
             SetActionAnimation(CharacterState.Attack, 0);
+            PlayCharacterSfx("Goku/goku_J_normal_attack_swing", 0.88f, 0.05f);
             rb.linearVelocity = new Vector2(facingDirection * 2f, rb.linearVelocity.y);
 
             float rawDamage = (isTransformed ? stats.transformedNormalAttackDamage : stats.normalAttackDamage) * (isKaiokenActive ? kaiokenDamageBonus : 1f);
@@ -209,6 +231,7 @@ namespace StickmanBeatEmUp.Characters
             if (currentState != CharacterState.Skill) yield break;
 
             Vector3 spawnPos = projectileSpawnPoint != null ? projectileSpawnPoint.position : transform.position + new Vector3(facingDirection * 0.9f, 0.85f, 0f);
+            PlayCharacterSfx("Goku/goku_U_normal_ki_blast", 0.95f);
 
             if (kiBlastPrefab != null)
             {
@@ -233,6 +256,7 @@ namespace StickmanBeatEmUp.Characters
         private IEnumerator SuperSaiyanMultiHitRoutine()
         {
             SetActionAnimation(CharacterState.Skill, 1);
+            PlayCharacterSfx("Goku/goku_U_ssj_multihit_flurry", 1.0f);
             ApplySuperSaiyanHitboxBoost();
 
             try
@@ -290,6 +314,7 @@ namespace StickmanBeatEmUp.Characters
 
         private void ActivateKaioken()
         {
+            PlayCharacterSfx("Goku/goku_I_normal_kaioken", 1.0f);
             if (kaiokenCoroutine != null) StopCoroutine(kaiokenCoroutine);
             kaiokenCoroutine = StartCoroutine(KaiokenBuffRoutine());
             StartCoroutine(KaiokenCastAnimRoutine());
@@ -326,6 +351,7 @@ namespace StickmanBeatEmUp.Characters
         private IEnumerator FireKamehamehaRoutine()
         {
             SetActionAnimation(CharacterState.Skill, 2);
+            PlayCharacterSfx("Goku/goku_I_ssj_kamehameha", 1.0f);
             rb.linearVelocity = Vector2.zero;
 
             Transform anchor = projectileSpawnPoint != null ? projectileSpawnPoint : transform;
@@ -388,6 +414,7 @@ namespace StickmanBeatEmUp.Characters
         private IEnumerator KiExplosionComboRoutine()
         {
             SetActionAnimation(CharacterState.Attack, 1);
+            PlayCharacterSfx("Goku/goku_dashJ_ki_explosion", 1.0f);
             rb.linearVelocity = Vector2.zero;
 
             Vector3 spawnPos = transform.position + Vector3.up * 0.85f;
@@ -421,6 +448,7 @@ namespace StickmanBeatEmUp.Characters
         private IEnumerator TransformRoutine()
         {
             ChangeState(CharacterState.Transform);
+            PlayCharacterSfx("Goku/goku_O_transform_ssj", 1.0f);
             rb.linearVelocity = Vector2.zero;
             isInvulnerable = true;
 
@@ -525,6 +553,7 @@ namespace StickmanBeatEmUp.Characters
                 float rawDamage = (stats != null ? stats.specialComboDamage : 35f) * (isKaiokenActive ? kaiokenDamageBonus : 1f);
                 float genkiDamage = GetModifiedDamage(rawDamage);
                 genkiProj.Initialize(gameObject, genkiDamage, facingDirection, enemyLayerMask, EnemyBase.GROUND_Y);
+                PlayCharacterSfx("Goku/goku_dashI_genkidama_charge", 0.95f);
 
                 // Gồng tụ năng lượng Spirit Bomb trên đỉnh đầu trong ~0.55s
                 const float chargeDuration = 0.55f;
@@ -554,6 +583,7 @@ namespace StickmanBeatEmUp.Characters
                 // Phóng quả cầu Genki Dama hướng về mục tiêu gần nhất phía trước & mặt đất
                 Vector2 launchVelocity = genkiProj.ComputeTargetAimVelocity(bombObj.transform.position);
                 genkiProj.Launch(launchVelocity);
+                PlayCharacterSfx("Goku/goku_dashI_genkidama_launch", 1.0f);
                 bombLaunched = true;
                 activeChargingGenkiDama = null;
 

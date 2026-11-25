@@ -5,6 +5,7 @@ using UnityEngine;
 #if UNITY_EDITOR
 using UnityEditor;
 #endif
+using StickmanBeatEmUp.Core;
 
 namespace StickmanGame.VFX
 {
@@ -98,6 +99,7 @@ namespace StickmanGame.VFX
         /// </summary>
         public static void Spawn(Vector3 hitPoint, Color tint, float scale = 1f)
         {
+            if (GameSettingsManager.HasInstance && !GameSettingsManager.Instance.ShowHitSparks) return;
             HitSparkManager mgr = EnsureInstance();
             if (mgr == null) return;
             mgr.SpawnInternal(hitPoint, tint, scale);

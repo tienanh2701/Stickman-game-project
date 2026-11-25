@@ -115,6 +115,7 @@ namespace StickmanBeatEmUp.UI
         [SerializeField] private Button playButton;
         [SerializeField] private Button instructionsButton;
         [SerializeField] private Button exitButton;
+        [SerializeField] private Button settingsButton;
 
         [Header("Screen 1B: Mode Select & Shop")]
         [SerializeField] private Button campaignModeButton;
@@ -223,6 +224,7 @@ namespace StickmanBeatEmUp.UI
         private bool isInventorySubscribed;
         private bool isAccountSubscribed;
         private bool authAutoAdvanceAfterAuth;
+        private SettingsModalUI settingsModalUI;
 
         private static readonly Dictionary<string, Sprite> cachedRuntimeSprites = new Dictionary<string, Sprite>(StringComparer.OrdinalIgnoreCase);
         private static readonly List<UnityEngine.Object> createdRuntimeSpriteAssets = new List<UnityEngine.Object>();
@@ -914,7 +916,10 @@ namespace StickmanBeatEmUp.UI
             if (Application.isPlaying)
             {
                 _ = AccountManager.Instance;
+                _ = GameSettingsManager.Instance;
+                StickmanBeatEmUp.Audio.AudioManager.Instance?.PlayMenuBgm();
                 EnsureAuthUIInitialized();
+                EnsureSettingsUIInitialized();
             }
             ApplyVietnameseFont();
             Time.timeScale = 1f;
@@ -1519,6 +1524,86 @@ namespace StickmanBeatEmUp.UI
             }
         }
 
+        private void EnsureSettingsUIInitialized()
+        {
+            if (!Application.isPlaying || mainMenuPanel == null) return;
+
+            if (settingsButton == null)
+            {
+                Transform existingBtn = mainMenuPanel.transform.Find("MainMenuSettingsButton");
+                if (existingBtn != null)
+                {
+                    settingsButton = existingBtn.GetComponent<Button>();
+                }
+                else
+                {
+                    GameObject btnObj = new GameObject(
+                        "MainMenuSettingsButton",
+                        typeof(RectTransform),
+                        typeof(Image),
+                        typeof(Button),
+                        typeof(ModeCardHoverEffect));
+                    btnObj.transform.SetParent(mainMenuPanel.transform, false);
+
+                    RectTransform rt = btnObj.GetComponent<RectTransform>();
+                    rt.anchorMin = new Vector2(1f, 1f);
+                    rt.anchorMax = new Vector2(1f, 1f);
+                    rt.pivot = new Vector2(1f, 1f);
+                    rt.anchoredPosition = new Vector2(-36f, -104f);
+                    rt.sizeDelta = new Vector2(204f, 58f);
+
+                    Image bgImg = btnObj.GetComponent<Image>();
+                    Sprite bgSp = pillSubtleGlassSprite ?? GlassHudTheme.LoadSprite("PillBtn_GlassNeutral.png");
+                    if (bgSp != null)
+                    {
+                        GlassHudTheme.ApplySlicedSprite(bgImg, bgSp, 204f, 58f, Color.white);
+                    }
+                    else
+                    {
+                        bgImg.color = new Color(0.14f, 0.22f, 0.36f, 0.94f);
+                    }
+                    bgImg.raycastTarget = true;
+
+                    Button btn = btnObj.GetComponent<Button>();
+                    btn.targetGraphic = bgImg;
+                    btn.navigation = new Navigation { mode = Navigation.Mode.None };
+
+                    ModeCardHoverEffect hover = btnObj.GetComponent<ModeCardHoverEffect>();
+                    hover.Configure(0f, 1.035f, 15f);
+
+                    GameObject lblObj = new GameObject("Label", typeof(RectTransform), typeof(TextMeshProUGUI));
+                    lblObj.transform.SetParent(btnObj.transform, false);
+                    RectTransform lblRt = lblObj.GetComponent<RectTransform>();
+                    lblRt.anchorMin = Vector2.zero;
+                    lblRt.anchorMax = Vector2.one;
+                    lblRt.pivot = new Vector2(0.5f, 0.5f);
+                    lblRt.offsetMin = new Vector2(10f, 4f);
+                    lblRt.offsetMax = new Vector2(-10f, -4f);
+
+                    TextMeshProUGUI tmp = lblObj.GetComponent<TextMeshProUGUI>();
+                    tmp.text = "CÀI ĐẶT";
+                    tmp.alignment = TextAlignmentOptions.Center;
+                    tmp.raycastTarget = false;
+                    if (runtimeTmpFont != null) tmp.font = runtimeTmpFont;
+                    GlassHudTheme.StyleTmpText(tmp, 20f, Color.white, bold: true, addShadow: true);
+
+                    settingsButton = btn;
+                }
+            }
+
+            if (settingsButton != null)
+            {
+                settingsButton.onClick.RemoveAllListeners();
+                settingsButton.onClick.AddListener(OpenSettingsModal);
+            }
+        }
+
+        public void OpenSettingsModal()
+        {
+            if (!Application.isPlaying) return;
+            settingsModalUI = SettingsModalUI.OpenForCanvas(transform);
+        }
+
         private void SubscribeAccountEvents()
         {
             if (isAccountSubscribed) return;
@@ -1796,6 +1881,11 @@ namespace StickmanBeatEmUp.UI
                 exitButton.onClick.RemoveAllListeners();
                 exitButton.onClick.AddListener(HandleExitClicked);
             }
+            if (settingsButton != null)
+            {
+                settingsButton.onClick.RemoveAllListeners();
+                settingsButton.onClick.AddListener(OpenSettingsModal);
+            }
 
             if (campaignModeButton != null)
             {
@@ -1911,6 +2001,10 @@ namespace StickmanBeatEmUp.UI
 
         public void ShowScreen(MainMenuScreen screen)
         {
+            if (settingsModalUI != null && settingsModalUI.IsOpen && screen != MainMenuScreen.MainMenu)
+            {
+                settingsModalUI.Close();
+            }
             if (screen != MainMenuScreen.Auth)
             {
                 authAutoAdvanceAfterAuth = false;

@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
+using StickmanBeatEmUp.Core;
+using StickmanBeatEmUp.CorePure.Settings;
 
 namespace StickmanBeatEmUp.UI
 {
@@ -39,6 +41,8 @@ namespace StickmanBeatEmUp.UI
         [SerializeField] private Sprite controlCardSprite;
         [SerializeField] private Sprite keycapBadgeSprite;
         [SerializeField] private Sprite[] guideActionIconSprites = Array.Empty<Sprite>();
+
+        private bool isSettingsSubscribed;
 
         public InstructionItem[] Items => items;
 
@@ -152,7 +156,101 @@ namespace StickmanBeatEmUp.UI
 
         private void OnEnable()
         {
+            SubscribeSettings();
             ApplySprites();
+        }
+
+        private void OnDisable()
+        {
+            UnsubscribeSettings();
+        }
+
+        private void OnDestroy()
+        {
+            UnsubscribeSettings();
+        }
+
+        private void SubscribeSettings()
+        {
+            if (isSettingsSubscribed || !Application.isPlaying) return;
+
+            GameSettingsManager settings = GameSettingsManager.Instance;
+            if (settings == null) return;
+
+            settings.OnKeyBindingsChanged -= ApplySprites;
+            settings.OnKeyBindingsChanged += ApplySprites;
+            isSettingsSubscribed = true;
+        }
+
+        private void UnsubscribeSettings()
+        {
+            if (!isSettingsSubscribed) return;
+
+            if (GameSettingsManager.HasInstance)
+            {
+                GameSettingsManager.Instance.OnKeyBindingsChanged -= ApplySprites;
+            }
+            isSettingsSubscribed = false;
+        }
+
+        private static string ResolveDynamicKeyCombo(int index, string fallbackCombo)
+        {
+            if (!Application.isPlaying) return fallbackCombo;
+
+            GameSettingsManager s = GameSettingsManager.HasInstance
+                ? GameSettingsManager.Instance
+                : GameSettingsManager.Instance;
+            if (s == null) return fallbackCombo;
+
+            string left = GameSettingsManager.FormatKeyLabel(s.GetKeyCode(GameInputAction.MoveLeft));
+            string right = GameSettingsManager.FormatKeyLabel(s.GetKeyCode(GameInputAction.MoveRight));
+            string jump = GameSettingsManager.FormatKeyLabel(s.GetKeyCode(GameInputAction.Jump));
+            string altJump = GameSettingsManager.FormatKeyLabel(s.GetKeyCode(GameInputAction.AltJump));
+            string block = GameSettingsManager.FormatKeyLabel(s.GetKeyCode(GameInputAction.Block));
+            string attack = GameSettingsManager.FormatKeyLabel(s.GetKeyCode(GameInputAction.Attack));
+            string skill1 = GameSettingsManager.FormatKeyLabel(s.GetKeyCode(GameInputAction.Skill1));
+            string skill2 = GameSettingsManager.FormatKeyLabel(s.GetKeyCode(GameInputAction.Skill2));
+            string transformKey = GameSettingsManager.FormatKeyLabel(s.GetKeyCode(GameInputAction.Transform));
+            string itemQ = GameSettingsManager.FormatKeyLabel(s.GetKeyCode(GameInputAction.ItemQ));
+            string itemE = GameSettingsManager.FormatKeyLabel(s.GetKeyCode(GameInputAction.ItemE));
+
+            switch (index)
+            {
+                case 0: return $"{left} / {right}";
+                case 1: return $"{altJump} / {jump}";
+                case 2: return $"{left}/{left} hoặc {right}/{right}";
+                case 3: return block;
+                case 4: return attack;
+                case 5: return skill1;
+                case 6: return skill2;
+                case 7: return $"Dash + {attack}";
+                case 8: return $"{itemQ} / {itemE}";
+                case 9: return transformKey;
+                default: return fallbackCombo;
+            }
+        }
+
+        private static string ResolveDynamicDescription(int index, string fallbackDesc)
+        {
+            if (!Application.isPlaying) return fallbackDesc;
+
+            GameSettingsManager s = GameSettingsManager.HasInstance
+                ? GameSettingsManager.Instance
+                : GameSettingsManager.Instance;
+            if (s == null) return fallbackDesc;
+
+            if (index == 1)
+            {
+                string jump = GameSettingsManager.FormatKeyLabel(s.GetKeyCode(GameInputAction.Jump));
+                string block = GameSettingsManager.FormatKeyLabel(s.GetKeyCode(GameInputAction.Block));
+                return $"Nhảy ({block} + {jump}: Rơi xuống thềm)";
+            }
+            if (index == 9)
+            {
+                string skill2 = GameSettingsManager.FormatKeyLabel(s.GetKeyCode(GameInputAction.Skill2));
+                return $"Biến hình / Tuyệt kỹ (Dash + {skill2}: Chiêu cuối)";
+            }
+            return fallbackDesc;
         }
 
         public void ApplySprites()
@@ -165,13 +263,16 @@ namespace StickmanBeatEmUp.UI
                 InstructionItem item = items[i];
                 if (item == null) continue;
 
-                if (item.keyLabel != null && !string.IsNullOrEmpty(item.keyCombo))
+                string combo = ResolveDynamicKeyCombo(i, item.keyCombo);
+                string desc = ResolveDynamicDescription(i, item.actionDescription);
+
+                if (item.keyLabel != null && !string.IsNullOrEmpty(combo))
                 {
-                    item.keyLabel.text = item.keyCombo;
+                    item.keyLabel.text = combo;
                 }
-                if (item.descriptionLabel != null && !string.IsNullOrEmpty(item.actionDescription))
+                if (item.descriptionLabel != null && !string.IsNullOrEmpty(desc))
                 {
-                    item.descriptionLabel.text = item.actionDescription;
+                    item.descriptionLabel.text = desc;
                 }
 
                 Sprite resolvedIcon = ResolveGuideActionSprite(i, item);

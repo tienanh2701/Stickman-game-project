@@ -5,6 +5,7 @@ using UnityEngine.InputSystem;
 using UnityEngine.InputSystem.Controls;
 #endif
 using StickmanBeatEmUp.CorePure.Interfaces;
+using StickmanBeatEmUp.CorePure.Settings;
 
 namespace StickmanBeatEmUp.Core
 {
@@ -41,6 +42,7 @@ namespace StickmanBeatEmUp.Core
         // Bộ đếm thời gian Double-tap
         private float lastLeftTapTime = -10f;
         private float lastRightTapTime = -10f;
+        private bool isSettingsSubscribed;
 
         // Các Action Event thông báo ra bên ngoài (Observer Pattern)
         public event Action<float> OnMoveEvent;         // horizontal (-1..1)
@@ -59,13 +61,94 @@ namespace StickmanBeatEmUp.Core
         public bool IsInputBlocked { get; set; } = false;
         public bool IsDropModifierHeld =>
             !IsInputBlocked &&
-            (IsKeyPressed(KeyCode.S) ||
-             WasKeyPressedThisFrame(KeyCode.S) ||
+            !GameSettingsManager.IsCapturingKeyRebind &&
+            (IsKeyPressed(blockKey) ||
+             WasKeyPressedThisFrame(blockKey) ||
              IsKeyPressed(KeyCode.DownArrow) ||
              WasKeyPressedThisFrame(KeyCode.DownArrow));
 
+        private void OnEnable()
+        {
+            SubscribeSettings();
+        }
+
+        private void Start()
+        {
+            SubscribeSettings();
+        }
+
+        private void OnDisable()
+        {
+            UnsubscribeSettings();
+        }
+
+        private void OnDestroy()
+        {
+            UnsubscribeSettings();
+        }
+
+        public void ApplyBindingsFromSettings(GameSettingsManager settings)
+        {
+            if (settings == null) return;
+
+            doubleTapTimeThreshold = settings.DoubleTapThreshold;
+            leftKey = settings.GetKeyCode(GameInputAction.MoveLeft);
+            rightKey = settings.GetKeyCode(GameInputAction.MoveRight);
+            jumpKey = settings.GetKeyCode(GameInputAction.Jump);
+            altJumpKey = settings.GetKeyCode(GameInputAction.AltJump);
+            attackKey = settings.GetKeyCode(GameInputAction.Attack);
+            skill1Key = settings.GetKeyCode(GameInputAction.Skill1);
+            skill2Key = settings.GetKeyCode(GameInputAction.Skill2);
+            transformKey = settings.GetKeyCode(GameInputAction.Transform);
+            blockKey = settings.GetKeyCode(GameInputAction.Block);
+            itemQKey = settings.GetKeyCode(GameInputAction.ItemQ);
+            itemEKey = settings.GetKeyCode(GameInputAction.ItemE);
+            pauseKey = settings.GetKeyCode(GameInputAction.Pause);
+        }
+
+        private void SubscribeSettings()
+        {
+            if (!Application.isPlaying) return;
+
+            GameSettingsManager settings = GameSettingsManager.Instance;
+            if (settings == null) return;
+
+            ApplyBindingsFromSettings(settings);
+            if (!isSettingsSubscribed)
+            {
+                settings.OnKeyBindingsChanged -= HandleKeyBindingsChanged;
+                settings.OnKeyBindingsChanged += HandleKeyBindingsChanged;
+                isSettingsSubscribed = true;
+            }
+        }
+
+        private void UnsubscribeSettings()
+        {
+            if (!isSettingsSubscribed) return;
+
+            if (GameSettingsManager.HasInstance)
+            {
+                GameSettingsManager.Instance.OnKeyBindingsChanged -= HandleKeyBindingsChanged;
+            }
+            isSettingsSubscribed = false;
+        }
+
+        private void HandleKeyBindingsChanged()
+        {
+            if (GameSettingsManager.HasInstance)
+            {
+                ApplyBindingsFromSettings(GameSettingsManager.Instance);
+            }
+        }
+
         private void Update()
         {
+            if (GameSettingsManager.IsCapturingKeyRebind)
+            {
+                HorizontalInput = 0f;
+                return;
+            }
+
             if (WasKeyPressedThisFrame(pauseKey))
             {
                 OnPauseEvent?.Invoke();
@@ -221,13 +304,26 @@ namespace StickmanBeatEmUp.Core
                 KeyCode.X => keyboard.xKey,
                 KeyCode.Y => keyboard.yKey,
                 KeyCode.Z => keyboard.zKey,
+                KeyCode.Alpha0 => keyboard.digit0Key,
+                KeyCode.Alpha1 => keyboard.digit1Key,
+                KeyCode.Alpha2 => keyboard.digit2Key,
+                KeyCode.Alpha3 => keyboard.digit3Key,
+                KeyCode.Alpha4 => keyboard.digit4Key,
+                KeyCode.Alpha5 => keyboard.digit5Key,
+                KeyCode.Alpha6 => keyboard.digit6Key,
+                KeyCode.Alpha7 => keyboard.digit7Key,
+                KeyCode.Alpha8 => keyboard.digit8Key,
+                KeyCode.Alpha9 => keyboard.digit9Key,
                 KeyCode.Space => keyboard.spaceKey,
+                KeyCode.Tab => keyboard.tabKey,
                 KeyCode.LeftArrow => keyboard.leftArrowKey,
                 KeyCode.RightArrow => keyboard.rightArrowKey,
                 KeyCode.UpArrow => keyboard.upArrowKey,
                 KeyCode.DownArrow => keyboard.downArrowKey,
                 KeyCode.LeftShift => keyboard.leftShiftKey,
                 KeyCode.RightShift => keyboard.rightShiftKey,
+                KeyCode.LeftControl => keyboard.leftCtrlKey,
+                KeyCode.RightControl => keyboard.rightCtrlKey,
                 KeyCode.Return => keyboard.enterKey,
                 KeyCode.Escape => keyboard.escapeKey,
                 _ => null

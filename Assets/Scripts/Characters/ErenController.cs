@@ -2,6 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using StickmanBeatEmUp.Core;
+using StickmanBeatEmUp.CorePure.Entities.Combat;
 using StickmanBeatEmUp.Combat;
 using StickmanBeatEmUp.Enemies;
 using StickmanBeatEmUp.Level;
@@ -41,6 +42,19 @@ namespace StickmanBeatEmUp.Characters
             originalScale = transform.localScale;
         }
 
+        protected override void PlayJumpSfx() => PlayCharacterSfx("Eren/eren_state_jump", 0.85f, 0.08f);
+        protected override void PlayDashSfx() => PlayCharacterSfx("Eren/eren_state_dash", 0.90f, 0.08f);
+        protected override void PlayHurtSfx(DamageData damageData, CombatDamageResult result) => PlayCharacterSfx("Eren/eren_state_hurt", 0.92f, 0.14f);
+        protected override void PlayDieSfx() => PlayCharacterSfx("Eren/eren_state_die", 1.0f);
+
+        protected override void PlayAttackHitSfx(AttackType attackType, IDamageable target)
+        {
+            if (attackType == AttackType.NormalAttack_J)
+            {
+                PlayCharacterSfx(isTransformed ? "Eren/eren_J_titan_punch_hit" : "Eren/eren_J_normal_slash_hit", 0.95f, 0.05f);
+            }
+        }
+
         #region Normal Form Attacks
         /// <summary>
         /// Đánh thường (Phím J): Chém kiếm song đao
@@ -53,6 +67,7 @@ namespace StickmanBeatEmUp.Characters
         private IEnumerator BladeSlashRoutine()
         {
             SetActionAnimation(CharacterState.Attack, 0);
+            PlayCharacterSfx("Eren/eren_J_normal_slash_swing", 0.88f, 0.05f);
             rb.linearVelocity = new Vector2(facingDirection * 3f, rb.linearVelocity.y);
 
             float damage = GetModifiedDamage(isTransformed ? stats.transformedNormalAttackDamage : stats.normalAttackDamage);
@@ -95,6 +110,7 @@ namespace StickmanBeatEmUp.Characters
         private IEnumerator DashSlashRoutine()
         {
             SetActionAnimation(CharacterState.Skill, 1);
+            PlayCharacterSfx("Eren/eren_U_normal_dash_slash", 0.95f);
             isInvulnerable = true;
 
             // Lướt vọt tới xuyên qua quái và chém
@@ -134,6 +150,7 @@ namespace StickmanBeatEmUp.Characters
             rb.linearVelocity = new Vector2(0f, rb.linearVelocity.y);
 
             // Đập đất tại chỗ (không lướt, không tạo sóng chạy ngang bản đồ)
+            PlayCharacterSfx("Eren/eren_U_titan_ground_slam", 1.0f);
             Vector3 slamCenter = transform.position + new Vector3(facingDirection * 1.4f, 0.3f, 0f);
             float slamDamage = GetModifiedDamage(stats.transformedSkill1Damage);
 
@@ -217,6 +234,7 @@ namespace StickmanBeatEmUp.Characters
             if (currentState != CharacterState.Skill) yield break;
 
             Vector3 spawnPos = projectileSpawnPoint != null ? projectileSpawnPoint.position : transform.position + new Vector3(facingDirection * 0.9f, 0.95f, 0f);
+            PlayCharacterSfx("Eren/eren_I_normal_thunder_spear_fire", 0.95f);
 
             if (thunderSpearPrefab != null)
             {
@@ -226,6 +244,7 @@ namespace StickmanBeatEmUp.Characters
                 {
                     float damage = GetModifiedDamage(stats.skill2Damage);
                     DamageData dData = new DamageData(damage, stats.skill2Knockback, AttackType.Skill_I, true, gameObject);
+                    proj.SetImpactSfx("Eren/eren_I_normal_thunder_spear_explode", 1.0f, 0.05f);
                     proj.Initialize(dData, new Vector2(facingDirection, 0f), enemyLayerMask, false);
                 }
             }
@@ -247,6 +266,7 @@ namespace StickmanBeatEmUp.Characters
             if (currentState != CharacterState.Skill) yield break;
 
             Vector3 spawnPos = transform.position + new Vector3(facingDirection * 1.5f, 1.15f, 0f);
+            PlayCharacterSfx("Eren/eren_I_titan_rock_throw", 0.95f);
             if (rockProjectilePrefab != null)
             {
                 GameObject rock = Instantiate(rockProjectilePrefab, spawnPos, Quaternion.identity);
@@ -265,6 +285,7 @@ namespace StickmanBeatEmUp.Characters
                         gameObject
                     );
                     proj.ConfigureTitanBoulder(7.0f, null);
+                    proj.SetImpactSfx("Eren/eren_I_titan_rock_smash", 1.0f, 0.05f);
                     proj.Initialize(dData, new Vector2(facingDirection, 0f), enemyLayerMask, true);
                 }
             }
@@ -287,6 +308,7 @@ namespace StickmanBeatEmUp.Characters
         private IEnumerator SpinSlashRoutine()
         {
             SetActionAnimation(CharacterState.Attack, 1);
+            PlayCharacterSfx("Eren/eren_dashJ_spin_slash", 1.0f);
 
             // Xoay kiếm khi lướt tới
             rb.linearVelocity = new Vector2(facingDirection * 10f, 0f);
@@ -323,6 +345,7 @@ namespace StickmanBeatEmUp.Characters
         private IEnumerator TitanTransformRoutine()
         {
             ChangeState(CharacterState.Transform);
+            PlayCharacterSfx("Eren/eren_O_transform_titan", 1.0f);
             rb.linearVelocity = Vector2.zero;
             isInvulnerable = true;
 
@@ -441,6 +464,7 @@ namespace StickmanBeatEmUp.Characters
             float stompDmg = GetModifiedDamage(rawStompDmg);
             float groundY = EnemyBase.GROUND_Y + 1.5f;
 
+            PlayCharacterSfx("Eren/eren_dashI_rumbling_roar", 1.0f);
             CameraFollowBeatEmUp.Instance?.Shake(0.35f, 0.32f);
 
             for (int i = 0; i < footCount; i++)

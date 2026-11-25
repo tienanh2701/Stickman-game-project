@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
+using StickmanBeatEmUp.Audio;
 
 namespace StickmanBeatEmUp.UI
 {
@@ -89,6 +90,10 @@ namespace StickmanBeatEmUp.UI
         public void OnPointerEnter(PointerEventData eventData)
         {
             if (!IsInteractable()) return;
+            if (!isHovered && Application.isPlaying && gameObject.scene.isLoaded)
+            {
+                AudioManager.Instance?.PlayUiSfx(UiSfxType.Hover, 0.58f);
+            }
             CaptureHitboxIfNeeded();
             isHovered = true;
             isAnimating = true;
@@ -103,6 +108,10 @@ namespace StickmanBeatEmUp.UI
         public void OnPointerDown(PointerEventData eventData)
         {
             if (!IsInteractable()) return;
+            if (Application.isPlaying && gameObject.scene.isLoaded)
+            {
+                AudioManager.Instance?.PlayUiSfx(UIButtonJuice.ResolveButtonSfxType(gameObject), 0.88f);
+            }
             CaptureHitboxIfNeeded();
             isPressed = true;
             isAnimating = true;
