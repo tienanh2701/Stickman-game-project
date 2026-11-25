@@ -1,0 +1,36 @@
+﻿%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 25913d4e77344cd18897f31736a47935, type: 3}
+  m_Name: AudioLibrarySO
+  m_EditorClassIdentifier: Assembly-CSharp::StickmanBeatEmUp.Audio.AudioLibrarySO
+  bgmTracks:
+  - id: bgm_menu
+    clip: {fileID: 8300000, guid: bca5c9f729334541a110d0a1724973ba, type: 3}
+  - id: bgm_world1
+    clip: {fileID: 8300000, guid: 544159d60f4e419b9340afcce485a9a7, type: 3}
+  - id: bgm_world2
+    clip: {fileID: 8300000, guid: 7f3a588f10e042bdaebb5d06444b225b, type: 3}
+  - id: bgm_world3
+    clip: {fileID: 8300000, guid: 0ca143c5fb8d4423a33243bf2a41ba14, type: 3}
+  sfxClips:
+  - id: sfx_attack
+    clip: {fileID: 8300000, guid: 119a9bf2872a42928fd06d7507d0af6c, type: 3}
+  - id: sfx_hit
+    clip: {fileID: 8300000, guid: 87bfcfcfb4e04cde90914b015f9458e3, type: 3}
+  - id: sfx_jump
+    clip: {fileID: 8300000, guid: 8c564e5f5b8f48f0ad3d8ae5380725fa, type: 3}
+  - id: sfx_item_use
+    clip: {fileID: 8300000, guid: 7ab8e0c4f7fb4769b43ecede60359aa0, type: 3}
+  - id: sfx_shop_buy
+    clip: {fileID: 8300000, guid: b2f051cf5a4240dfbb1611d79d7c331d, type: 3}
+  - id: sfx_ui_click
+    clip: {fileID: 8300000, guid: d0fc4d6cbb5c499586c128e51873f1fa, type: 3}
