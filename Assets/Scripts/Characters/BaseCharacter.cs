@@ -254,6 +254,8 @@ namespace StickmanBeatEmUp.Characters
             if (dashTrail != null)
             {
                 dashTrail.emitting = false;
+                dashTrail.Clear();
+                dashTrail.enabled = false;
             }
 
             if (transformAuraEffect != null)
@@ -1015,12 +1017,20 @@ namespace StickmanBeatEmUp.Characters
             bool invulnerable = stats != null && stats.isInvulnerableDuringDash;
 
             if (invulnerable) isInvulnerable = true;
-            if (dashTrail != null) dashTrail.emitting = true;
+            if (dashTrail != null)
+            {
+                dashTrail.emitting = false;
+                dashTrail.enabled = false;
+            }
+
+            DashVfxManager.SpawnDashBurst(transform.position, direction, isGrounded);
 
             // Tắt trọng lực tạm thời để lướt ngang mượt mà
             rb.gravityScale = 0f;
             rb.linearVelocity = new Vector2(direction * speed, 0f);
 
+            const float stepInterval = 0.055f;
+            float nextStepTime = stepInterval;
             float timer = 0f;
             while (timer < duration)
             {
@@ -1030,6 +1040,11 @@ namespace StickmanBeatEmUp.Characters
                     break;
                 }
                 timer += Time.deltaTime;
+                if (timer >= nextStepTime && timer < duration)
+                {
+                    DashVfxManager.SpawnDashStep(transform.position, direction, isGrounded);
+                    nextStepTime += stepInterval;
+                }
                 yield return null;
             }
 
@@ -1587,6 +1602,8 @@ namespace StickmanBeatEmUp.Characters
             if (dashTrail != null)
             {
                 dashTrail.emitting = false;
+                dashTrail.Clear();
+                dashTrail.enabled = false;
             }
 
             if (blockShieldVisual != null)

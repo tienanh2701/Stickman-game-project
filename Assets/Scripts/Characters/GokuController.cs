@@ -355,7 +355,9 @@ namespace StickmanBeatEmUp.Characters
             rb.linearVelocity = Vector2.zero;
 
             Transform anchor = projectileSpawnPoint != null ? projectileSpawnPoint : transform;
-            Vector3 anchorOffset = projectileSpawnPoint != null ? Vector3.zero : new Vector3(facingDirection * 0.9f, 0.85f, 0f);
+            Vector3 anchorOffset = projectileSpawnPoint != null
+                ? new Vector3(-facingDirection * 0.15f, 0.04f, 0f)
+                : new Vector3(facingDirection * 0.55f, 0.89f, 0f);
             Vector3 spawnPos = anchor.position + anchorOffset;
 
             BeamAttack beam = null;
