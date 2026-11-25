@@ -6,6 +6,7 @@ using System.Text;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using StickmanBeatEmUp.Core;
+using StickmanBeatEmUp.CorePure.Exceptions;
 using StickmanBeatEmUp.Economy;
 using StickmanBeatEmUp.Items;
 using StickmanBeatEmUp.Level;
@@ -496,6 +497,37 @@ namespace StickmanBeatEmUp.Auth
             return null;
         }
 
+        /// <summary>
+        /// Phân tích tệp tài khoản và ném SaveCorruptedException nếu JSON sai cú pháp hoặc rỗng cấu trúc (hỗ trợ kiểm thử Fault-Injection).
+        /// </summary>
+        public static AccountSaveDatabase ParseAccountDatabaseOrThrow(string json, string storageKey = ACCOUNTS_FILE_NAME)
+        {
+            if (string.IsNullOrWhiteSpace(json))
+            {
+                throw new SaveCorruptedException(storageKey, "Accounts JSON payload is empty.");
+            }
+
+            string trimmed = json.Trim();
+            if (!trimmed.StartsWith("{", StringComparison.Ordinal) || !trimmed.EndsWith("}", StringComparison.Ordinal))
+            {
+                throw new SaveCorruptedException(storageKey, "Accounts JSON root must be an object.");
+            }
+
+            try
+            {
+                AccountSaveDatabase loaded = JsonUtility.FromJson<AccountSaveDatabase>(trimmed);
+                if (loaded == null)
+                {
+                    throw new SaveCorruptedException(storageKey, "Deserialized AccountSaveDatabase is null.");
+                }
+                return loaded;
+            }
+            catch (ArgumentException ex)
+            {
+                throw new SaveCorruptedException(storageKey, $"Invalid accounts JSON format: {ex.Message}", ex);
+            }
+        }
+
         private void LoadDatabaseFromDisk()
         {
             string filePath = GetAccountsFilePath();
@@ -508,14 +540,8 @@ namespace StickmanBeatEmUp.Auth
             try
             {
                 string json = File.ReadAllText(filePath, Encoding.UTF8);
-                if (string.IsNullOrWhiteSpace(json))
-                {
-                    database = new AccountSaveDatabase();
-                    return;
-                }
-
-                AccountSaveDatabase loaded = JsonUtility.FromJson<AccountSaveDatabase>(json);
-                database = loaded ?? new AccountSaveDatabase();
+                AccountSaveDatabase loaded = ParseAccountDatabaseOrThrow(json, ACCOUNTS_FILE_NAME);
+                database = loaded;
                 EnsureDatabaseInitialized();
 
                 HashSet<string> seenUsernames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -557,9 +583,19 @@ namespace StickmanBeatEmUp.Auth
                 }
                 database.accounts = validAccounts;
             }
-            catch (Exception ex)
+            catch (SaveCorruptedException ex)
             {
-                Debug.LogWarning($"[AccountManager] Failed to read accounts file: {ex.Message}");
+                Debug.Log($"[AccountManager][{ex.ErrorCode}] Key='{ex.StorageKey}': {ex.Message}. Resetting local account cache.");
+                database = new AccountSaveDatabase();
+            }
+            catch (IOException ex)
+            {
+                Debug.Log($"[AccountManager][IO_READ_FAIL] Failed to read accounts file: {ex.Message}");
+                database = new AccountSaveDatabase();
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                Debug.Log($"[AccountManager][PERM_READ_FAIL] Access denied reading accounts file: {ex.Message}");
                 database = new AccountSaveDatabase();
             }
         }
@@ -588,8 +624,14 @@ namespace StickmanBeatEmUp.Auth
                     {
                         File.Replace(tmpPath, targetPath, bakPath, ignoreMetadataErrors: true);
                     }
-                    catch (Exception)
+                    catch (IOException ex)
                     {
+                        Debug.Log($"[AccountManager][IO_REPLACE_FALLBACK] File.Replace fallback to Copy: {ex.Message}");
+                        File.Copy(tmpPath, targetPath, overwrite: true);
+                    }
+                    catch (UnauthorizedAccessException ex)
+                    {
+                        Debug.Log($"[AccountManager][PERM_REPLACE_FALLBACK] File.Replace access fallback to Copy: {ex.Message}");
                         File.Copy(tmpPath, targetPath, overwrite: true);
                     }
                 }
@@ -599,15 +641,25 @@ namespace StickmanBeatEmUp.Auth
                     {
                         File.Move(tmpPath, targetPath);
                     }
-                    catch (Exception)
+                    catch (IOException ex)
                     {
+                        Debug.Log($"[AccountManager][IO_MOVE_FALLBACK] File.Move fallback to Copy: {ex.Message}");
+                        File.Copy(tmpPath, targetPath, overwrite: true);
+                    }
+                    catch (UnauthorizedAccessException ex)
+                    {
+                        Debug.Log($"[AccountManager][PERM_MOVE_FALLBACK] File.Move access fallback to Copy: {ex.Message}");
                         File.Copy(tmpPath, targetPath, overwrite: true);
                     }
                 }
             }
-            catch (Exception ex)
+            catch (IOException ex)
             {
-                Debug.LogWarning($"[AccountManager] Failed to save accounts file: {ex.Message}");
+                Debug.Log($"[AccountManager][IO_SAVE_FAIL] Failed to save accounts file: {ex.Message}");
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                Debug.Log($"[AccountManager][PERM_SAVE_FAIL] Access denied saving accounts file: {ex.Message}");
             }
             finally
             {
@@ -626,9 +678,13 @@ namespace StickmanBeatEmUp.Auth
                     File.Delete(path);
                 }
             }
-            catch (Exception)
+            catch (IOException ex)
             {
-                // Ignore cleanup error for transient temp/backup files.
+                Debug.Log($"[AccountManager][CLEANUP_IO] Could not remove transient file '{path}': {ex.Message}");
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                Debug.Log($"[AccountManager][CLEANUP_PERM] Access denied removing transient file '{path}': {ex.Message}");
             }
         }
 

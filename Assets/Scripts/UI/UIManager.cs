@@ -813,8 +813,19 @@ namespace StickmanBeatEmUp.UI
                 createdRuntimeSpriteAssets.Add(created);
                 return created;
             }
-            catch (Exception)
+            catch (IOException ex)
             {
+                Debug.Log($"[UIManager][SPRITE_IO_ERROR] Failed reading sprite '{diskPath}': {ex.Message}");
+                return null;
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                Debug.Log($"[UIManager][SPRITE_PERM_ERROR] Access denied reading sprite '{diskPath}': {ex.Message}");
+                return null;
+            }
+            catch (ArgumentException ex)
+            {
+                Debug.Log($"[UIManager][SPRITE_ARG_ERROR] Invalid sprite data '{diskPath}': {ex.Message}");
                 return null;
             }
         }
@@ -3388,6 +3399,7 @@ namespace StickmanBeatEmUp.UI
                 ConsumableItemType.SenzuBean => LoadItemIconSprite("Icon_SenzuBean.png"),
                 ConsumableItemType.SpinalFluid => LoadItemIconSprite("Icon_SpinalFluid.png"),
                 ConsumableItemType.UltraDivineWater => LoadItemIconSprite("Icon_UltraDivineWater.png"),
+                ConsumableItemType.RageElixir => LoadItemIconSprite("Icon_UltraDivineWater.png"),
                 _ => null
             };
         }
