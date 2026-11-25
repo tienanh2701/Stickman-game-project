@@ -1,5 +1,6 @@
 using System;
 using NUnit.Framework;
+using StickmanBeatEmUp.CorePure.Entities.Combat;
 using StickmanBeatEmUp.CorePure.Entities.DTOs;
 using StickmanBeatEmUp.CorePure.Interfaces;
 using StickmanBeatEmUp.CorePure.Patterns.Decorators;
@@ -10,9 +11,9 @@ namespace StickmanBeatEmUp.Tests.CoreUnit.TV2
     public class Tv2DecoratorTests
     {
         [Test]
-        public void DefaultStatSource_DefaultInstance_HasNeutralMultipliersAndZeroBonuses()
+        public void BaseStatSource_DefaultInstance_HasNeutralMultipliersAndZeroBonuses()
         {
-            DefaultStatSource stats = DefaultStatSource.Default;
+            BaseStatSource stats = BaseStatSource.Default;
 
             Assert.AreEqual(1f, stats.AttackDamageMultiplier, 0.0001f);
             Assert.AreEqual(1f, stats.MoveSpeedMultiplier, 0.0001f);
@@ -24,7 +25,7 @@ namespace StickmanBeatEmUp.Tests.CoreUnit.TV2
         [Test]
         public void SpinalFluidShieldDecorator_ValidValues_AddsShieldAndReflect()
         {
-            IStatSource baseStats = DefaultStatSource.Default;
+            IStatSource baseStats = BaseStatSource.Default;
             SpinalFluidShieldDecorator decorator = new SpinalFluidShieldDecorator(baseStats, 40f, 5f);
 
             Assert.AreEqual(1f, decorator.AttackDamageMultiplier, 0.0001f);
@@ -37,7 +38,7 @@ namespace StickmanBeatEmUp.Tests.CoreUnit.TV2
         [Test]
         public void SpinalFluidShieldDecorator_NegativeOrNaNOrInfinity_ClampsToZero()
         {
-            IStatSource baseStats = DefaultStatSource.Default;
+            IStatSource baseStats = BaseStatSource.Default;
             SpinalFluidShieldDecorator nanDecorator = new SpinalFluidShieldDecorator(baseStats, float.NaN, float.PositiveInfinity);
             SpinalFluidShieldDecorator negDecorator = new SpinalFluidShieldDecorator(baseStats, -10f, -5f);
 
@@ -50,7 +51,7 @@ namespace StickmanBeatEmUp.Tests.CoreUnit.TV2
         [Test]
         public void UltraDivineWaterDecorator_ValidValues_ScalesMultipliersAndAddsRage()
         {
-            IStatSource baseStats = DefaultStatSource.Default;
+            IStatSource baseStats = BaseStatSource.Default;
             UltraDivineWaterDecorator decorator = new UltraDivineWaterDecorator(baseStats, 1.5f, 1.3f, 2f);
 
             Assert.AreEqual(1.5f, decorator.AttackDamageMultiplier, 0.0001f);
@@ -63,7 +64,7 @@ namespace StickmanBeatEmUp.Tests.CoreUnit.TV2
         [Test]
         public void UltraDivineWaterDecorator_NegativeOrNaN_FallsBackToNeutralMultiplier()
         {
-            IStatSource baseStats = DefaultStatSource.Default;
+            IStatSource baseStats = BaseStatSource.Default;
             UltraDivineWaterDecorator nanDecorator = new UltraDivineWaterDecorator(baseStats, float.NaN, float.NegativeInfinity, float.NaN);
             UltraDivineWaterDecorator negDecorator = new UltraDivineWaterDecorator(baseStats, -2f, -1f, -5f);
 
@@ -79,7 +80,7 @@ namespace StickmanBeatEmUp.Tests.CoreUnit.TV2
         [Test]
         public void RageRegenDecorator_ValidAndEdgeValues_AddsRageSafely()
         {
-            IStatSource baseStats = DefaultStatSource.Default;
+            IStatSource baseStats = BaseStatSource.Default;
             RageRegenDecorator valid = new RageRegenDecorator(baseStats, 3f);
             RageRegenDecorator nan = new RageRegenDecorator(baseStats, float.NaN);
 

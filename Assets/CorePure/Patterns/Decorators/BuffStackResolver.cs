@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using StickmanBeatEmUp.CorePure.Entities.Combat;
 using StickmanBeatEmUp.CorePure.Entities.DTOs;
 using StickmanBeatEmUp.CorePure.Interfaces;
 
@@ -154,7 +155,7 @@ namespace StickmanBeatEmUp.CorePure.Patterns.Decorators
         /// </summary>
         public IStatSource BuildStatChain(IStatSource baseSource = null)
         {
-            IStatSource current = baseSource ?? DefaultStatSource.Default;
+            IStatSource current = baseSource ?? BaseStatSource.Default;
             for (int i = 0; i < activeBuffs.Count; i++)
             {
                 current = activeBuffs[i].DecoratorFactory(current);

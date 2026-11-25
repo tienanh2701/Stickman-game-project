@@ -11,6 +11,7 @@ using StickmanBeatEmUp.Characters;
 using StickmanBeatEmUp.Economy;
 using StickmanBeatEmUp.Items;
 using StickmanBeatEmUp.Level;
+using StickmanBeatEmUp.Persistence;
 
 namespace StickmanBeatEmUp.UI
 {
@@ -45,6 +46,11 @@ namespace StickmanBeatEmUp.UI
         private CanvasGroup pauseBoxCanvasGroup;
         private Image pauseBoxImage;
         private Coroutine popInCoroutine;
+
+        private GameObject runtimeUtilityBar;
+        private Button runtimeSaveButton;
+        private Button runtimeLoadButton;
+        private TMP_Text runtimeSaveFeedbackText;
 
         public bool IsPaused => isPaused;
 
@@ -118,6 +124,9 @@ namespace StickmanBeatEmUp.UI
                 {
                     ApplyGlassModalTheme();
                 }
+
+                EnsureRuntimeUtilityBar();
+                RefreshUtilityBarState();
 
                 if (!wasPaused || !wasPanelActive)
                 {
@@ -689,6 +698,129 @@ namespace StickmanBeatEmUp.UI
             else if (SceneManager.sceneCountInBuildSettings > 0)
             {
                 SceneManager.LoadScene(0);
+            }
+        }
+
+        private void EnsureRuntimeUtilityBar()
+        {
+            if (!Application.isPlaying || pauseModalPanel == null || runtimeUtilityBar != null) return;
+
+            runtimeUtilityBar = new GameObject("PauseUtilityBar", typeof(RectTransform), typeof(Image));
+            runtimeUtilityBar.transform.SetParent(pauseModalPanel.transform, false);
+
+            RectTransform barRt = runtimeUtilityBar.GetComponent<RectTransform>();
+            barRt.anchorMin = new Vector2(0.5f, 0.5f);
+            barRt.anchorMax = new Vector2(0.5f, 0.5f);
+            barRt.pivot = new Vector2(0.5f, 0.5f);
+            barRt.anchoredPosition = new Vector2(0f, -262f);
+            barRt.sizeDelta = new Vector2(540f, 88f);
+
+            Image barImg = runtimeUtilityBar.GetComponent<Image>();
+            barImg.color = new Color(0.05f, 0.09f, 0.16f, 0.88f);
+            barImg.raycastTarget = true;
+
+            runtimeSaveButton = CreateRuntimeUtilityButton(runtimeUtilityBar.transform, "PauseSaveMatchButton", "LƯU TRẬN", new Vector2(-175f, 12f), new Vector2(165f, 44f), new Color(0.14f, 0.55f, 0.36f, 1f));
+            runtimeLoadButton = CreateRuntimeUtilityButton(runtimeUtilityBar.transform, "PauseLoadMatchButton", "TẢI TRẬN", new Vector2(0f, 12f), new Vector2(165f, 44f), new Color(0.16f, 0.44f, 0.72f, 1f));
+
+            runtimeSaveButton.onClick.AddListener(HandleSaveMatchClicked);
+            runtimeLoadButton.onClick.AddListener(HandleLoadMatchClicked);
+
+            GameObject fbObj = new GameObject("SaveFeedbackText", typeof(RectTransform), typeof(TextMeshProUGUI));
+            fbObj.transform.SetParent(runtimeUtilityBar.transform, false);
+            RectTransform fbRt = fbObj.GetComponent<RectTransform>();
+            fbRt.anchorMin = new Vector2(0.5f, 0f);
+            fbRt.anchorMax = new Vector2(0.5f, 0f);
+            fbRt.pivot = new Vector2(0.5f, 0f);
+            fbRt.anchoredPosition = new Vector2(0f, 4f);
+            fbRt.sizeDelta = new Vector2(520f, 24f);
+
+            runtimeSaveFeedbackText = fbObj.GetComponent<TextMeshProUGUI>();
+            runtimeSaveFeedbackText.alignment = TextAlignmentOptions.Center;
+            runtimeSaveFeedbackText.text = string.Empty;
+            runtimeSaveFeedbackText.raycastTarget = false;
+            GlassHudTheme.StyleTmpText(runtimeSaveFeedbackText, 16f, new Color(0.75f, 0.96f, 1f, 1f), true, true);
+        }
+
+        private static Button CreateRuntimeUtilityButton(
+            Transform parent,
+            string objName,
+            string label,
+            Vector2 anchoredPos,
+            Vector2 size,
+            Color tintColor)
+        {
+            GameObject btnObj = new GameObject(objName, typeof(RectTransform), typeof(Image), typeof(Button));
+            btnObj.transform.SetParent(parent, false);
+
+            RectTransform rt = btnObj.GetComponent<RectTransform>();
+            rt.anchorMin = new Vector2(0.5f, 0.5f);
+            rt.anchorMax = new Vector2(0.5f, 0.5f);
+            rt.pivot = new Vector2(0.5f, 0.5f);
+            rt.anchoredPosition = anchoredPos;
+            rt.sizeDelta = size;
+
+            Image img = btnObj.GetComponent<Image>();
+            Sprite pill = GlassHudTheme.LoadSprite("PillBtn_GlassNeutral.png");
+            if (pill != null)
+            {
+                GlassHudTheme.ApplySlicedSprite(img, pill, size.x, size.y, tintColor);
+            }
+            else
+            {
+                img.color = tintColor;
+            }
+
+            GameObject txtObj = new GameObject("Label", typeof(RectTransform), typeof(TextMeshProUGUI));
+            txtObj.transform.SetParent(btnObj.transform, false);
+            RectTransform txtRt = txtObj.GetComponent<RectTransform>();
+            txtRt.anchorMin = Vector2.zero;
+            txtRt.anchorMax = Vector2.one;
+            txtRt.offsetMin = Vector2.zero;
+            txtRt.offsetMax = Vector2.zero;
+
+            TMP_Text tmp = txtObj.GetComponent<TextMeshProUGUI>();
+            tmp.text = label;
+            tmp.alignment = TextAlignmentOptions.Center;
+            tmp.raycastTarget = false;
+            GlassHudTheme.StyleTmpText(tmp, 18f, Color.white, true, true);
+
+            return btnObj.GetComponent<Button>();
+        }
+
+        private void RefreshUtilityBarState()
+        {
+            if (runtimeLoadButton != null && MidMatchSaveManager.Instance != null)
+            {
+                runtimeLoadButton.interactable = MidMatchSaveManager.Instance.HasSavedMatch();
+            }
+        }
+
+        private void HandleSaveMatchClicked()
+        {
+            MidMatchSaveManager mgr = MidMatchSaveManager.Instance;
+            if (mgr == null) return;
+
+            bool ok = mgr.SaveCurrentMatch(out string msg);
+            if (runtimeSaveFeedbackText != null)
+            {
+                runtimeSaveFeedbackText.text = msg;
+                runtimeSaveFeedbackText.color = ok
+                    ? new Color(0.45f, 1f, 0.62f, 1f)
+                    : new Color(1f, 0.42f, 0.42f, 1f);
+            }
+            RefreshUtilityBarState();
+        }
+
+        private void HandleLoadMatchClicked()
+        {
+            MidMatchSaveManager mgr = MidMatchSaveManager.Instance;
+            if (mgr == null) return;
+
+            bool ok = mgr.TryLoadSavedMatch(out string msg);
+            if (!ok && runtimeSaveFeedbackText != null)
+            {
+                runtimeSaveFeedbackText.text = msg;
+                runtimeSaveFeedbackText.color = new Color(1f, 0.42f, 0.42f, 1f);
             }
         }
     }

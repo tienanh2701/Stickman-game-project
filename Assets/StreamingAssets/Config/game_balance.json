@@ -1,0 +1,72 @@
+{
+  "version": 1,
+  "playerBaseMaxHp": 100.0,
+  "maxRage": 30,
+  "blockDamageMultiplier": 0.2,
+  "endlessWaveHpGrowth": 0.03,
+  "endlessMaxDamageMultiplier": 1.75,
+  "shopItems": [
+    {
+      "itemTypeId": 1,
+      "itemName": "Đậu Thần",
+      "price": 30,
+      "healAmount": 10.0,
+      "buffDuration": 0.0,
+      "shieldAmount": 0.0,
+      "reflectDamage": 0.0,
+      "damageMultiplier": 1.0,
+      "speedMultiplier": 1.0,
+      "ragePerSecond": 0.0
+    },
+    {
+      "itemTypeId": 2,
+      "itemName": "Dịch Tủy Titan",
+      "price": 60,
+      "healAmount": 0.0,
+      "buffDuration": 30.0,
+      "shieldAmount": 40.0,
+      "reflectDamage": 5.0,
+      "damageMultiplier": 1.0,
+      "speedMultiplier": 1.0,
+      "ragePerSecond": 0.0
+    },
+    {
+      "itemTypeId": 3,
+      "itemName": "Nước Siêu Thần",
+      "price": 50,
+      "healAmount": 0.0,
+      "buffDuration": 60.0,
+      "shieldAmount": 0.0,
+      "reflectDamage": 0.0,
+      "damageMultiplier": 1.5,
+      "speedMultiplier": 1.3,
+      "ragePerSecond": 2.0
+    },
+    {
+      "itemTypeId": 4,
+      "itemName": "Tinh Chất Cuồng Nộ",
+      "price": 40,
+      "healAmount": 0.0,
+      "buffDuration": 20.0,
+      "shieldAmount": 0.0,
+      "reflectDamage": 0.0,
+      "damageMultiplier": 1.0,
+      "speedMultiplier": 1.0,
+      "ragePerSecond": 3.0
+    }
+  ],
+  "levels": [
+    { "worldIndex": 1, "stageIndex": 1, "enemyHpMultiplier": 1.00, "enemyDamageMultiplier": 1.00, "bonusClearCoins": 20 },
+    { "worldIndex": 1, "stageIndex": 2, "enemyHpMultiplier": 1.08, "enemyDamageMultiplier": 1.05, "bonusClearCoins": 25 },
+    { "worldIndex": 1, "stageIndex": 3, "enemyHpMultiplier": 1.16, "enemyDamageMultiplier": 1.10, "bonusClearCoins": 30 },
+    { "worldIndex": 1, "stageIndex": 4, "enemyHpMultiplier": 1.25, "enemyDamageMultiplier": 1.15, "bonusClearCoins": 50 },
+    { "worldIndex": 2, "stageIndex": 1, "enemyHpMultiplier": 1.30, "enemyDamageMultiplier": 1.20, "bonusClearCoins": 35 },
+    { "worldIndex": 2, "stageIndex": 2, "enemyHpMultiplier": 1.38, "enemyDamageMultiplier": 1.25, "bonusClearCoins": 40 },
+    { "worldIndex": 2, "stageIndex": 3, "enemyHpMultiplier": 1.46, "enemyDamageMultiplier": 1.30, "bonusClearCoins": 45 },
+    { "worldIndex": 2, "stageIndex": 4, "enemyHpMultiplier": 1.55, "enemyDamageMultiplier": 1.35, "bonusClearCoins": 75 },
+    { "worldIndex": 3, "stageIndex": 1, "enemyHpMultiplier": 1.60, "enemyDamageMultiplier": 1.40, "bonusClearCoins": 50 },
+    { "worldIndex": 3, "stageIndex": 2, "enemyHpMultiplier": 1.68, "enemyDamageMultiplier": 1.45, "bonusClearCoins": 60 },
+    { "worldIndex": 3, "stageIndex": 3, "enemyHpMultiplier": 1.76, "enemyDamageMultiplier": 1.50, "bonusClearCoins": 70 },
+    { "worldIndex": 3, "stageIndex": 4, "enemyHpMultiplier": 1.85, "enemyDamageMultiplier": 1.55, "bonusClearCoins": 100 }
+  ]
+}

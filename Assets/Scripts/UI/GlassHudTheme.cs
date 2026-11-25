@@ -987,8 +987,19 @@ namespace StickmanBeatEmUp.UI
                 CreatedRuntimeAssetSet.Add(created);
                 return created;
             }
-            catch
+            catch (IOException ex)
             {
+                Debug.Log($"[GlassHudTheme][SPRITE_IO_ERROR] Failed reading sprite '{diskPath}': {ex.Message}");
+                return null;
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                Debug.Log($"[GlassHudTheme][SPRITE_PERM_ERROR] Access denied reading sprite '{diskPath}': {ex.Message}");
+                return null;
+            }
+            catch (ArgumentException ex)
+            {
+                Debug.Log($"[GlassHudTheme][SPRITE_ARG_ERROR] Invalid sprite data '{diskPath}': {ex.Message}");
                 return null;
             }
         }

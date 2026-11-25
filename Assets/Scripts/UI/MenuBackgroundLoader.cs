@@ -221,9 +221,17 @@ namespace StickmanBeatEmUp.UI
                     runtimeLoadedSprite = sprite;
                     return runtimeLoadedSprite;
                 }
-                catch (Exception)
+                catch (IOException ex)
                 {
-                    // Ignore unreadable candidate and continue fallback chain
+                    Debug.Log($"[MenuBackgroundLoader][BG_IO_ERROR] Unreadable background candidate '{candidate}': {ex.Message}");
+                }
+                catch (UnauthorizedAccessException ex)
+                {
+                    Debug.Log($"[MenuBackgroundLoader][BG_PERM_ERROR] Access denied for background '{candidate}': {ex.Message}");
+                }
+                catch (ArgumentException ex)
+                {
+                    Debug.Log($"[MenuBackgroundLoader][BG_ARG_ERROR] Invalid background image '{candidate}': {ex.Message}");
                 }
             }
 
